@@ -1,0 +1,111 @@
+{
+  "source": "../QCAD/QCAD",
+  "imported_on": "2026-10-08",
+  "files": [
+    {
+      "file": "ENTITY.H",
+      "sha256": "056f923a7dfc0c5480ac74fc06c0fe7aff8b341b9422c0cde157ecfce01f863c",
+      "source_encoding": "gb18030"
+    },
+    {
+      "file": "ENTITY.CPP",
+      "sha256": "5e82f3777218a1ef9083158b90133a8f2763e0c2be986a412fc574635026a590",
+      "source_encoding": "gb18030"
+    },
+    {
+      "file": "LINE.CPP",
+      "sha256": "7db3ff2b190fc6c5b29c15a2717eebec3012c3c47d8d217a8334f751777e151a",
+      "source_encoding": "gb18030"
+    },
+    {
+      "file": "RECTANGLE.cpp",
+      "sha256": "def5ee04bb78c4077e57dfaa7676d2c5c9b19e21692b436957c6d561e73969c9",
+      "source_encoding": "gb18030"
+    },
+    {
+      "file": "Circle.cpp",
+      "sha256": "d60294bce9df73990c3534fbb9c091f4a301284f65fd531fef29e20939c5b4e8",
+      "source_encoding": "gb18030"
+    },
+    {
+      "file": "Arc.cpp",
+      "sha256": "c185edce762a001bd6488d849d414ef03c4e94a79df8118c801c133f8a905769",
+      "source_encoding": "gb18030"
+    },
+    {
+      "file": "ELLIPSE.cpp",
+      "sha256": "48e890a9ed77c9bea6e4e7f464fdfaf9ff8fa945b1e9082b1abf17392f8d1212",
+      "source_encoding": "gb18030"
+    },
+    {
+      "file": "MPolygon.cpp",
+      "sha256": "87d198cb63a1962f4b67d3be56ae598196ef58748da23f8f93796fa2b228c6e3",
+      "source_encoding": "gb18030"
+    },
+    {
+      "file": "TEXT.cpp",
+      "sha256": "dbc58eb069d34d75aba4d8a11a6cce2d938a400e73d73ff309fe9759e5cb7e12",
+      "source_encoding": "utf-8"
+    },
+    {
+      "file": "QCADView.h",
+      "sha256": "4b5a241cc51f63c9e35d9a6c9251764d55be2d7654aaaed9254b2de546dc47c6",
+      "source_encoding": "gb18030"
+    },
+    {
+      "file": "QCADView.cpp",
+      "sha256": "4ad5e057b1ff7a6ad9612fc87976d8573f99ec71f9882f503d1168d9fc3f3b71",
+      "source_encoding": "gb18030"
+    },
+    {
+      "file": "MCommand.h",
+      "sha256": "4bf93eb0d0c2522679545cbed04e25b187de65880924838130a5032ba998cafa",
+      "source_encoding": "gb18030"
+    },
+    {
+      "file": "MCommand.cpp",
+      "sha256": "c1029e69dd436c3031c01fff8bcc5361971882d455f8d1150433fadaf57366e2",
+      "source_encoding": "gb18030"
+    },
+    {
+      "file": "MZoomPan.h",
+      "sha256": "b2e1d4171e506517f1414b3714b939d85bc68b02ad46e1b8747577d0618c3b7d",
+      "source_encoding": "utf-8"
+    },
+    {
+      "file": "MZoomPan.cpp",
+      "sha256": "6cacfa9813b6004ca9efd9d033dca5c93b3638f384e24ebd92c0a44fd9c61232",
+      "source_encoding": "gb18030"
+    },
+    {
+      "file": "MZoomWindow.h",
+      "sha256": "310ff197aa784a7a2afc54c834c2b2218abed67d2a2136ff0d2d3725bb09a17d",
+      "source_encoding": "utf-8"
+    },
+    {
+      "file": "MZoomWindow.cpp",
+      "sha256": "19e82972247c4986ff0b2ed3780cde8f8fe719f7e1fada7547b0953ff7263896",
+      "source_encoding": "gb18030"
+    },
+    {
+      "file": "mainwindow.h",
+      "sha256": "314fce697b500d7958a4307f50386fe1d5a614e5a3ec6d6d88397194ca5ced39",
+      "source_encoding": "gb18030"
+    },
+    {
+      "file": "mainwindow.cpp",
+      "sha256": "d79446bb57439b33260cbb2b85c56b20d32f930579c47488cab22905563973ee",
+      "source_encoding": "gb18030"
+    },
+    {
+      "file": "diagramitem.h",
+      "sha256": "12485ed71317b01c6ed74579ab85d1e69898e188df2bdb9c5c591e5a7846ab48",
+      "source_encoding": "utf-8"
+    },
+    {
+      "file": "main.cpp",
+      "sha256": "15f358da0009a24f2227e117dbe2c6b153da549ec1555db47394b77a7f0c6942",
+      "source_encoding": "utf-8"
+    }
+  ]
+}

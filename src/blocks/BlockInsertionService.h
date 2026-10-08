@@ -7,8 +7,8 @@ class QCADView;
 
 namespace qcad_more {
 
-// One instance per active insertion command. Preview state belongs here when
-// implemented; rendering must not append temporary entities to the document.
+// This service is stateless. QCADView owns a separate preview entity;
+// temporary geometry is never appended to the document entity list.
 class BlockInsertionService {
 public:
     OperationResult previewAt(QCADView& view, const BlockLibrary& library,

@@ -9,7 +9,7 @@
 namespace qcad_more {
 
 // Value snapshots own their bytes; they never own or retain live MEntity pointers.
-// The future codec must record its version and fix legacy Serialize() first.
+// Payloads use EntityCodec and QDataStream::Qt_5_12 under document format v1.
 struct EntitySnapshot {
     int entityType = 0; // Maps to EEntityType in the course project's ENTITY.H.
     QByteArray payload;
@@ -36,7 +36,7 @@ struct InsertBlockRequest {
     QPointF position; // World coordinates to which the block origin is mapped.
 };
 
-// Future block entities persist this reference instead of duplicating definitions.
+// Block entities persist this reference instead of duplicating definitions.
 // Each successful insertion creates its own non-null instanceId.
 struct BlockInstance {
     QUuid instanceId;

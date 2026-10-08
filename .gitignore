@@ -3,3 +3,5 @@
 /.vs/
 *.user
 CMakeUserPresets.json
+
+/aqtinstall.log

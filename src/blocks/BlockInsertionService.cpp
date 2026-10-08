@@ -1,25 +1,38 @@
 #include "blocks/BlockInsertionService.h"
-
+#include "blocks/BlockEntity.h"
 namespace qcad_more {
-
-OperationResult BlockInsertionService::previewAt(QCADView&, const BlockLibrary&,
-                                                 const InsertBlockRequest&)
+namespace {
+OperationResult prepare(const BlockLibrary& library, const InsertBlockRequest& request,
+                        std::unique_ptr<BlockEntity>& output)
 {
-    // TODO: I1 - resolve definition and draw temporary geometry at world position.
-    return OperationResult::notImplemented("BlockInsertionService::previewAt");
+    const auto* definition = findBlock(library, request.definitionId);
+    if (!definition) return {ErrorCode::BlockNotFound, QStringLiteral("找不到所选块定义。")};
+    return makeBlockEntity(*definition, {QUuid::createUuid(), request.definitionId, request.position}, output);
 }
-
-OperationResult BlockInsertionService::insertAt(QCADView&, const BlockLibrary&,
-                                                const InsertBlockRequest&, QUuid&)
+}
+OperationResult BlockInsertionService::previewAt(QCADView& view, const BlockLibrary& library,
+                                                 const InsertBlockRequest& request)
 {
-    // TODO: I1 - create a block instance with the existing entity/command lifecycle.
-    return OperationResult::notImplemented("BlockInsertionService::insertAt");
+    std::unique_ptr<BlockEntity> block;
+    auto result = prepare(library, request, block);
+    if (result.ok()) view.setPreview(std::move(block));
+    return result;
 }
-
-OperationResult BlockInsertionService::cancelPreview(QCADView&)
+OperationResult BlockInsertionService::insertAt(QCADView& view, const BlockLibrary& library,
+                                                const InsertBlockRequest& request, QUuid& instanceId)
 {
-    // TODO: I1 - release transient preview state and refresh the view.
-    return OperationResult::notImplemented("BlockInsertionService::cancelPreview");
+    std::unique_ptr<BlockEntity> block;
+    auto result = prepare(library, request, block);
+    if (!result.ok()) return result;
+    const auto id = block->instance.instanceId;
+    view.addEntity(block.release());
+    view.setPreview(nullptr);
+    instanceId = id;
+    return {};
 }
-
-} // namespace qcad_more
+OperationResult BlockInsertionService::cancelPreview(QCADView& view)
+{
+    view.setPreview(nullptr);
+    return {};
+}
+}
