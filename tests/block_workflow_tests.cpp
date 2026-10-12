@@ -150,17 +150,17 @@ void BlockWorkflowTests::windowWorkflow()
     QTest::mouseClick(view, Qt::LeftButton, {}, at({-215,100}));
     QCOMPARE(view->GetEntityList().size(), 3);
     view->selectEntity();
-    QTest::mouseClick(view, Qt::LeftButton, {}, at({-270,125}));
-    QCOMPARE(view->GetSelectedEntityList().size(), 1);
-    auto* edit = window.findChild<QAction*>("textPropertiesAction"); QVERIFY(edit);
     QTimer::singleShot(30, [] {
         if (auto* dialog = dynamic_cast<TextPropertiesDialog*>(QApplication::activeModalWidget())) {
+            auto* fonts = dialog->findChild<QFontComboBox*>();
+            QVERIFY(fonts != nullptr);
+            QVERIFY(fonts->count() > 0);
             dialog->findChild<QPlainTextEdit*>("textContent")->setPlainText(QStringLiteral("设备 A / 文本已编辑"));
             dialog->findChild<QDoubleSpinBox*>("fontSize")->setValue(11);
             dialog->accept();
         }
     });
-    edit->trigger();
+    QTest::mouseDClick(view, Qt::LeftButton, {}, at({-270,125}));
     QCOMPARE(dynamic_cast<MText*>(view->GetEntityList()[2])->GetText(), QStringLiteral("设备 A / 文本已编辑"));
     // Real drag selection, then define with a canvas base point.
     QTest::mousePress(view, Qt::LeftButton, {}, at({-415,195}));

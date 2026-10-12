@@ -38,6 +38,7 @@ public:
    ~MainWindow() override;
    QCADView* canvas() const { return view; }
    qcad_more::BlockLibrary& blockLibrary() { return blockLibrary_; }
+   void editSelectedText();
 protected:
    void closeEvent(QCloseEvent* event) override;
 private:

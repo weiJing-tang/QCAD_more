@@ -30,7 +30,7 @@
 
 OperationResult 的 None 为成功，其余区分主动取消、参数错误、空选择、重名、不支持的图元、块不存在、IO 错误和格式错误。未完成的骨架入口已全部替换。
 
-TextProperties 是完整属性集，不是部分更新；校验通过后一次性修改。独立 Text 支持 Unicode、多行、字体、颜色和归一化文本框；取消对话框不应用。
+TextProperties 是完整属性集，不是部分更新；校验通过后一次性修改。独立 Text 支持 Unicode、多行、本机 QFontDatabase 字体列表、0.1–10000 pt 可输入字号、字体样式、颜色和归一化文本框；取消对话框不应用。QCADView 在选择命令下优先处理 Text 双击，直接打开同一个属性编辑对话框。
 
 QcadBlockActions 的 defineBlock/beginInsertBlock 返回成功表示交互已启动；真正定义或插入在 PointCommand 接收到画布位置时执行。提交失败显示消息，成功后刷新并标记文档已修改。
 

@@ -8,12 +8,17 @@ TextPropertiesDialog::TextPropertiesDialog(const TextProperties& p, QWidget* par
     auto* form = new QFormLayout(this);
     content_ = new QPlainTextEdit(p.content, this); content_->setObjectName("textContent");
     form->addRow(QStringLiteral("内容"), content_);
-    family_ = new QFontComboBox(this); family_->setCurrentFont(p.font); form->addRow(QStringLiteral("字体"), family_);
+    family_ = new QFontComboBox(this);
+    family_->setFontFilters(QFontComboBox::AllFonts);
+    family_->setWritingSystem(QFontDatabase::Any);
+    family_->setEditable(true);
+    family_->setCurrentFont(p.font);
+    form->addRow(QStringLiteral("字体（本机全部字体）"), family_);
     auto spin = [this](const char* name, double value, double minimum, double maximum) {
         auto* field = new QDoubleSpinBox(this); field->setObjectName(name); field->setDecimals(3);
         field->setRange(minimum, maximum); field->setValue(value); return field;
     };
-    size_ = spin("fontSize", p.font.pointSizeF() > 0 ? p.font.pointSizeF() : 12, 1, 1000);
+    size_ = spin("fontSize", p.font.pointSizeF() > 0 ? p.font.pointSizeF() : 12, 0.1, 10000);
     form->addRow(QStringLiteral("字号（pt）"), size_);
     bold_ = new QCheckBox(QStringLiteral("粗体"), this); bold_->setChecked(p.font.bold());
     italic_ = new QCheckBox(QStringLiteral("斜体"), this); italic_->setChecked(p.font.italic());

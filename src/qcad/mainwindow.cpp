@@ -754,6 +754,9 @@ void MainWindow::createToolbars()
     //editToolBar->addAction(sendBackAction);
 
     fontCombo = new QFontComboBox();
+    fontCombo->setFontFilters(QFontComboBox::AllFonts);
+    fontCombo->setWritingSystem(QFontDatabase::Any);
+    fontCombo->setEditable(true);
     connect(fontCombo, SIGNAL(currentFontChanged(QFont)),
             this, SLOT(currentFontChanged(QFont)));
 
@@ -761,7 +764,7 @@ void MainWindow::createToolbars()
     fontSizeCombo->setEditable(true);
     for (int i = 8; i < 30; i = i + 2)
         fontSizeCombo->addItem(QString().setNum(i));
-    QIntValidator *validator = new QIntValidator(2, 64, this);
+    QIntValidator *validator = new QIntValidator(1, 10000, this);
     fontSizeCombo->setValidator(validator);
     connect(fontSizeCombo, SIGNAL(currentIndexChanged(QString)),
             this, SLOT(fontSizeChanged(QString)));
@@ -1115,6 +1118,12 @@ void MainWindow::drawText()
     ;
 #endif // QT_PAINTER
 
+}
+
+void MainWindow::editSelectedText()
+{
+    if (blockActions_)
+        reportResult(blockActions_->editSelectedText());
 }
 
 //修改

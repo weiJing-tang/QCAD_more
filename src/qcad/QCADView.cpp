@@ -166,9 +166,26 @@ void QCADView::mouseDoubleClickEvent(QMouseEvent* mouseEvent)
 		return;
 	}
 
+    const QPointF worldPoint = ScreentoWorld(mouseEvent->pos());
+	const bool selecting = !m_pCmd || m_pCmd->GetType() == ctSelect;
+	if (selecting) {
+        for (auto it = m_EntityList.crbegin(); it != m_EntityList.crend(); ++it) {
+            MEntity* entity = *it;
+            if (entity->GetType() == etText && entity->Pick(worldPoint, 5.0 / GetScale())) {
+                ClearSelections();
+                AddSelection(entity);
+                update();
+                if (g_pMainWnd)
+                    g_pMainWnd->editSelectedText();
+                return;
+            }
+        }
+    }
+
 	if (m_pCmd)
 	{
 		m_pCmd->OnLButtonDblClk(mouseEvent);
+        return;
 	}
 }
 
