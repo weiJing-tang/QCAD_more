@@ -15,6 +15,9 @@ public:
     bool Pick(const QPointF& point, double radius) override;
     void GetBox(QRectF& box) override;
     void Move(const QPointF& from, const QPointF& to, bool temporary = false) override;
+    QTransform worldTransform() const;
+    void Serialize(QDataStream& stream, bool save) override;
+    void collectTexts(QVector<MText*>& texts, QStringList& labels, const QString& prefix = {});
 };
 OperationResult makeBlockEntity(const BlockDefinition& definition, const BlockInstance& instance,
                                 std::unique_ptr<BlockEntity>& output);

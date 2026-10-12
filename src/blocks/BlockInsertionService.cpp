@@ -7,7 +7,8 @@ OperationResult prepare(const BlockLibrary& library, const InsertBlockRequest& r
 {
     const auto* definition = findBlock(library, request.definitionId);
     if (!definition) return {ErrorCode::BlockNotFound, QStringLiteral("找不到所选块定义。")};
-    return makeBlockEntity(*definition, {QUuid::createUuid(), request.definitionId, request.position}, output);
+    return makeBlockEntity(*definition, {QUuid::createUuid(), request.definitionId, request.position,
+                                       request.rotationDegrees, request.scale}, output);
 }
 }
 OperationResult BlockInsertionService::previewAt(QCADView& view, const BlockLibrary& library,

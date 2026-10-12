@@ -27,6 +27,7 @@ if ($Check) {
         & (Join-Path (Split-Path $cmake) 'ctest.exe') --test-dir $buildRoot -C Release --output-on-failure --timeout 90
         if ($LASTEXITCODE -ne 0) {
             Get-Content -LiteralPath "$buildRoot/test-results.txt" -ErrorAction SilentlyContinue
+            Get-Content -LiteralPath "$buildRoot/native-tests/test-results-windows.txt" -ErrorAction SilentlyContinue
             throw 'Workflow verification failed.'
         }
     } finally { $env:PATH = $savedPath; $env:QT_QPA_PLATFORM_PLUGIN_PATH = $savedPlugins }

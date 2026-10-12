@@ -10,6 +10,7 @@ public:
     OperationResult defineBlock();
     OperationResult editSelectedText();
     OperationResult beginInsertBlock();
+    OperationResult editSelectedBlockTransform();
     OperationResult save();
     OperationResult saveAs();
     OperationResult open();

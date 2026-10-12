@@ -45,4 +45,11 @@ if(BUILD_TESTING)
     endif()
     add_test(NAME block_workflow COMMAND block_workflow_tests -o test-results.txt,txt)
     set_tests_properties(block_workflow PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
+    if(WIN32)
+        file(MAKE_DIRECTORY "${CMAKE_BINARY_DIR}/native-tests")
+        add_test(NAME block_workflow_windows COMMAND block_workflow_tests -o test-results-windows.txt,txt)
+        set_tests_properties(block_workflow_windows PROPERTIES
+            ENVIRONMENT "QT_QPA_PLATFORM=windows"
+            WORKING_DIRECTORY "${CMAKE_BINARY_DIR}/native-tests")
+    endif()
 endif()

@@ -1,0 +1,37 @@
+********* Start testing of BlockWorkflowTests *********
+Config: Using QtTest library 5.15.2, Qt 5.15.2 (x86_64-little_endian-llp64 shared (dynamic) release build; by MSVC 2019), windows 10
+PASS   : BlockWorkflowTests::initTestCase()
+PASS   : BlockWorkflowTests::documentRoundTrip()
+PASS   : BlockWorkflowTests::failedLoadPreservesDocument()
+QWARN  : BlockWorkflowTests::selectionWithZoomAndShift() QFontDatabase: Cannot find font directory C:/Users/jing/Desktop/¦Ä??2303????/??????????/QCAD_more/build/Qt/5.15.2/msvc2019_64/lib/fonts.
+Note that Qt no longer ships fonts. Deploy some (from https://dejavu-fonts.github.io/ for example) or switch to fontconfig.
+QWARN  : BlockWorkflowTests::selectionWithZoomAndShift() This plugin does not support propagateSizeHints()
+PASS   : BlockWorkflowTests::selectionWithZoomAndShift()
+PASS   : BlockWorkflowTests::blockSnapshotIsolation()
+PASS   : BlockWorkflowTests::invalidFilesPreserveDocument(wrong-magic)
+PASS   : BlockWorkflowTests::invalidFilesPreserveDocument(unsupported-version)
+PASS   : BlockWorkflowTests::invalidFilesPreserveDocument(excessive-record-count)
+PASS   : BlockWorkflowTests::invalidFilesPreserveDocument(trailing-data)
+QWARN  : BlockWorkflowTests::textPropertiesAndCancellation() This plugin does not support propagateSizeHints()
+QWARN  : BlockWorkflowTests::textPropertiesAndCancellation() This plugin does not support propagateSizeHints()
+QWARN  : BlockWorkflowTests::textPropertiesAndCancellation() This plugin does not support propagateSizeHints()
+PASS   : BlockWorkflowTests::textPropertiesAndCancellation()
+QWARN  : BlockWorkflowTests::nestedTransformsAndTextRoundTrip() This plugin does not support propagateSizeHints()
+QWARN  : BlockWorkflowTests::nestedTransformsAndTextRoundTrip() This plugin does not support propagateSizeHints()
+QWARN  : BlockWorkflowTests::nestedTransformsAndTextRoundTrip() This plugin does not support propagateSizeHints()
+QWARN  : BlockWorkflowTests::nestedTransformsAndTextRoundTrip() This plugin does not support propagateSizeHints()
+QWARN  : BlockWorkflowTests::nestedTransformsAndTextRoundTrip() This plugin does not support propagateSizeHints()
+PASS   : BlockWorkflowTests::nestedTransformsAndTextRoundTrip()
+QWARN  : BlockWorkflowTests::windowWorkflow() This plugin does not support propagateSizeHints()
+QWARN  : BlockWorkflowTests::windowWorkflow() This plugin does not support propagateSizeHints()
+QWARN  : BlockWorkflowTests::windowWorkflow() This plugin does not support propagateSizeHints()
+QWARN  : BlockWorkflowTests::windowWorkflow() This plugin does not support propagateSizeHints()
+QWARN  : BlockWorkflowTests::windowWorkflow() This plugin does not support propagateSizeHints()
+QWARN  : BlockWorkflowTests::windowWorkflow() This plugin does not support propagateSizeHints()
+QWARN  : BlockWorkflowTests::windowWorkflow() This plugin does not support propagateSizeHints()
+QWARN  : BlockWorkflowTests::windowWorkflow() This plugin does not support propagateSizeHints()
+QWARN  : BlockWorkflowTests::windowWorkflow() This plugin does not support propagateSizeHints()
+PASS   : BlockWorkflowTests::windowWorkflow()
+PASS   : BlockWorkflowTests::cleanupTestCase()
+Totals: 13 passed, 0 failed, 0 skipped, 0 blacklisted, 1096ms
+********* Finished testing of BlockWorkflowTests *********

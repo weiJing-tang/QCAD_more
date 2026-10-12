@@ -2,6 +2,7 @@
 #include "integration/PointCommand.h"
 #include "blocks/BlockDefinitionService.h"
 #include "blocks/BlockInsertionService.h"
+#include "blocks/BlockEntity.h"
 #include "selection/SelectionService.h"
 #include "text/TextPropertyService.h"
 #include "text/TextPropertiesDialog.h"
@@ -12,6 +13,23 @@
 namespace qcad_more {
 namespace {
 OperationResult cancelled() { return {ErrorCode::Cancelled, {}}; }
+bool editTransform(QWidget& parent, double& angle, double& factor)
+{
+    QDialog settings(&parent); settings.setWindowTitle(QStringLiteral("块旋转与缩放"));
+    settings.setObjectName("blockTransformDialog");
+    QFormLayout form(&settings);
+    QDoubleSpinBox rotation; rotation.setObjectName("blockRotation"); rotation.setRange(-36000,36000);
+    rotation.setDecimals(3); rotation.setValue(angle);
+    QDoubleSpinBox scale; scale.setObjectName("blockScale"); scale.setRange(.001,10000);
+    scale.setDecimals(3); scale.setValue(factor);
+    form.addRow(QStringLiteral("旋转角度（度，逆时针）"), &rotation);
+    form.addRow(QStringLiteral("等比缩放"), &scale);
+    QDialogButtonBox buttons(QDialogButtonBox::Ok | QDialogButtonBox::Cancel); form.addRow(&buttons);
+    QObject::connect(&buttons, &QDialogButtonBox::accepted, &settings, &QDialog::accept);
+    QObject::connect(&buttons, &QDialogButtonBox::rejected, &settings, &QDialog::reject);
+    if (settings.exec() != QDialog::Accepted) return false;
+    angle = rotation.value(); factor = scale.value(); return true;
+}
 }
 QcadBlockActions::QcadBlockActions(QCADView& view, BlockLibrary& library, QWidget& parent)
     : view_(view), library_(library), dialogParent_(parent) {}
@@ -39,9 +57,19 @@ OperationResult QcadBlockActions::editSelectedText()
 {
     view_.selectEntity();
     const auto selected = view_.GetSelectedEntityList();
-    if (selected.size() != 1 || selected.front()->GetType() != etText)
-        return {ErrorCode::InvalidInput, QStringLiteral("请只选择一个 Text 文本。")};
+    if (selected.size() != 1)
+        return {ErrorCode::InvalidInput, QStringLiteral("请只选择一个 Text 文本或块实例。")};
     auto* text = dynamic_cast<MText*>(selected.front());
+    if (auto* block = dynamic_cast<BlockEntity*>(selected.front())) {
+        QVector<MText*> texts; QStringList labels;
+        block->collectTexts(texts, labels);
+        if (texts.isEmpty()) return {ErrorCode::InvalidInput, QStringLiteral("该块中没有 Text 文本。")};
+        bool ok = false;
+        const auto label = QInputDialog::getItem(&dialogParent_, QStringLiteral("编辑块内文字"),
+            QStringLiteral("选择文字（位置和尺寸使用变换前坐标）："), labels, 0, false, &ok);
+        if (!ok) return cancelled();
+        text = texts[labels.indexOf(label)];
+    }
     if (!text) return {ErrorCode::InvalidInput, QStringLiteral("所选对象不是文本。")};
     TextProperties properties;
     TextPropertyService service;
@@ -63,14 +91,29 @@ OperationResult QcadBlockActions::beginInsertBlock()
     const auto name = QInputDialog::getItem(&dialogParent_, QStringLiteral("插入块"), QStringLiteral("选择块："), names, 0, false, &ok);
     if (!ok) return cancelled();
     const auto id = library_.definitions[names.indexOf(name)].id;
-    view_.setCommand(new PointCommand(&view_, [this, id](const QPointF& point) {
+    double angle = 0, factor = 1;
+    if (!editTransform(dialogParent_, angle, factor)) return cancelled();
+    view_.setCommand(new PointCommand(&view_, [this, id, angle, factor](const QPointF& point) {
         QUuid instanceId;
-        return BlockInsertionService().insertAt(view_, library_, {id, point}, instanceId);
-    }, [this, id](const QPointF& point) {
-        return BlockInsertionService().previewAt(view_, library_, {id, point});
+        return BlockInsertionService().insertAt(view_, library_, {id, point, angle, factor}, instanceId);
+    }, [this, id, angle, factor](const QPointF& point) {
+        return BlockInsertionService().previewAt(view_, library_, {id, point, angle, factor});
     }, true));
     Prompt(QStringLiteral("移动鼠标预览，单击插入；Esc / 右键结束。"));
     return {};
+}
+OperationResult QcadBlockActions::editSelectedBlockTransform()
+{
+    view_.selectEntity();
+    const auto selected = view_.GetSelectedEntityList();
+    if (selected.size() != 1)
+        return {ErrorCode::InvalidInput, QStringLiteral("请只选择一个块实例。")};
+    auto* block = dynamic_cast<BlockEntity*>(selected.front());
+    if (!block) return {ErrorCode::InvalidInput, QStringLiteral("所选对象不是块实例。")};
+    double angle = block->instance.rotationDegrees, factor = block->instance.scale;
+    if (!editTransform(dialogParent_, angle, factor)) return cancelled();
+    block->instance.rotationDegrees = angle; block->instance.scale = factor;
+    view_.setModified(true); view_.update(); return {};
 }
 void QcadBlockActions::updateTitle()
 {

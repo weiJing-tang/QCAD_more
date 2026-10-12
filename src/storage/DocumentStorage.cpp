@@ -7,7 +7,7 @@
 namespace qcad_more {
 namespace {
 constexpr quint32 Magic = 0x51424c4b; // QBLK
-constexpr quint32 Version = 1;
+constexpr quint32 Version = 2;
 constexpr quint32 MaxRecords = 100000;
 constexpr qint64 MaxFileBytes = 128 * 1024 * 1024;
 OperationResult invalid() { return {ErrorCode::InvalidFormat, QStringLiteral("文件格式错误、版本不支持或块引用不完整。")}; }
@@ -60,7 +60,10 @@ OperationResult DocumentStorage::save(const QString& path, QCADView& view, const
             if (instance.instanceId.isNull() || instanceIds.contains(instance.instanceId) ||
                 !findBlock(library, instance.definitionId) || !finitePoint(instance.position)) return invalid();
             instanceIds.insert(instance.instanceId);
-            out << instance.instanceId << instance.definitionId << instance.position;
+            EntitySnapshot snapshot;
+            result = encodeEntity(*block, snapshot);
+            if (!result.ok()) return result;
+            out << snapshot.payload;
         } else {
             EntitySnapshot snapshot;
             result = encodeEntity(*entity, snapshot);
@@ -83,7 +86,7 @@ OperationResult DocumentStorage::load(const QString& path, QCADView& view, Block
     QDataStream in(&file); in.setVersion(QDataStream::Qt_5_12);
     quint32 magic = 0, version = 0, count = 0;
     in >> magic >> version;
-    if (magic != Magic || version != Version || !readCount(in, count)) return invalid();
+    if (magic != Magic || (version != 1 && version != Version) || !readCount(in, count)) return invalid();
     BlockLibrary loaded;
     for (quint32 i = 0; i < count; ++i) {
         BlockDefinition block; quint32 entityCount = 0;
@@ -103,6 +106,19 @@ OperationResult DocumentStorage::load(const QString& path, QCADView& view, Block
     for (quint32 i = 0; i < count; ++i) {
         qint32 type = 0; in >> type;
         if (type == etBlock) {
+            if (version == 2) {
+                EntitySnapshot snapshot; snapshot.entityType = etBlock; in >> snapshot.payload;
+                std::unique_ptr<MEntity> entity;
+                result = decodeEntity(snapshot, entity);
+                if (!result.ok()) return result;
+                auto* block = dynamic_cast<BlockEntity*>(entity.get());
+                if (!block || !findBlock(loaded, block->instance.definitionId) ||
+                    instanceIds.contains(block->instance.instanceId)) return invalid();
+                instanceIds.insert(block->instance.instanceId);
+                entities.push_back(std::move(entity));
+                if (in.status() != QDataStream::Ok) return invalid();
+                continue;
+            }
             BlockInstance instance;
             in >> instance.instanceId >> instance.definitionId >> instance.position;
             const auto* definition = findBlock(loaded, instance.definitionId);

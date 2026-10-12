@@ -1,6 +1,7 @@
 #pragma once
 #include <QWidget>
 #include <QList>
+#include <QTransform>
 #include <memory>
 #include <functional>
 
@@ -19,6 +20,7 @@ private:
     bool modified_ = false;
 
 public:
+    QTransform drawingTransform;
     QCADView();
     ~QCADView();
 

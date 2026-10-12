@@ -94,6 +94,7 @@ MainWindow::MainWindow()
     };
     addBlockAction(QStringLiteral("定义块"), "defineBlockAction", &qcad_more::QcadBlockActions::defineBlock);
     addBlockAction(QStringLiteral("插入块"), "insertBlockAction", &qcad_more::QcadBlockActions::beginInsertBlock);
+    addBlockAction(QStringLiteral("块旋转/缩放"), "blockTransformAction", &qcad_more::QcadBlockActions::editSelectedBlockTransform);
     auto* textProperties = addBlockAction(QStringLiteral("Text 属性"), "textPropertiesAction", &qcad_more::QcadBlockActions::editSelectedText);
     textProperties->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_E));
     auto* selectAll = blockMenu->addAction(QStringLiteral("选择全部图形"));

@@ -113,6 +113,7 @@ QPointF MPolygon::GetEndPos()
 void MPolygon::Draw(QCADView* pView, int drawMode)
 {
     QPainter pDC(pView);
+    pDC.setWorldTransform(pView->drawingTransform);
     // 需要检查 m_pPositions 是否有足够的点来绘制多边形
     if (m_numpts < 3) return;
 

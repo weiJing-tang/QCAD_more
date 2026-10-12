@@ -67,6 +67,7 @@ QPointF MEllipse::GetRBPos() {
 void MEllipse::Draw(QCADView* pView, int drawMode)
 {
     QPainter pDC(pView);
+    pDC.setWorldTransform(pView->drawingTransform);
     //if (drawMode == dmInvalid) return;
 
     if (drawMode == dmSelect)

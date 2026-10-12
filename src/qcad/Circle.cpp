@@ -83,6 +83,7 @@ MEntity* CCircle::Copy()
 void CCircle::Draw(QCADView* pView, int drawMode)
 {
     QPainter pDC(pView);
+    pDC.setWorldTransform(pView->drawingTransform);
     QPointF topLeft(m_center.x() - m_dRadius, m_center.y() + m_dRadius);
     QPointF bottom_right(m_center.x() + m_dRadius, m_center.y() - m_dRadius);
     topLeft = pView->WorldtoScreen(topLeft);

@@ -18,6 +18,12 @@ private slots:
     void initTestCase();
     void documentRoundTrip();
     void failedLoadPreservesDocument();
+    void selectionWithZoomAndShift();
+    void blockSnapshotIsolation();
+    void invalidFilesPreserveDocument_data();
+    void invalidFilesPreserveDocument();
+    void textPropertiesAndCancellation();
+    void nestedTransformsAndTextRoundTrip();
     void windowWorkflow();
 };
 
@@ -95,12 +101,24 @@ void BlockWorkflowTests::documentRoundTrip()
     QVERIFY(DocumentStorage().load(path, loadedView, loadedLibrary).ok());
     QCOMPARE(loadedView.GetEntityList().size(), 9);
     QCOMPARE(loadedLibrary.definitions.size(), 1); QCOMPARE(loadedLibrary.definitions[0].id, definitionId);
+    for (int i = 0; i < originals.size(); ++i) {
+        EntitySnapshot restoredSnapshot;
+        QVERIFY(encodeEntity(*loadedView.GetEntityList()[i], restoredSnapshot).ok());
+        QCOMPARE(restoredSnapshot.entityType, originals[i].entityType);
+        QCOMPARE(restoredSnapshot.payload, originals[i].payload);
+    }
     TextProperties restored;
     QVERIFY(TextPropertyService().read(*dynamic_cast<MText*>(loadedView.GetEntityList()[6]), restored).ok());
     QCOMPARE(restored.content, properties.content); QCOMPARE(restored.font, properties.font);
     QCOMPARE(restored.color, properties.color); QCOMPARE(restored.bounds, properties.bounds);
     auto* block = dynamic_cast<BlockEntity*>(loadedView.GetEntityList()[7]); QVERIFY(block);
     QCOMPARE(block->instance.instanceId, firstId); QCOMPARE(block->instance.position, QPointF(190,35));
+    for (size_t i = 0; i < firstBlock->children.size(); ++i) {
+        EntitySnapshot expected, actual;
+        QVERIFY(encodeEntity(*firstBlock->children[i], expected).ok());
+        QVERIFY(encodeEntity(*block->children[i], actual).ok());
+        QCOMPARE(actual.payload, expected.payload);
+    }
     auto* blockText = dynamic_cast<MText*>(block->children[6].get()); QVERIFY(blockText);
     QCOMPARE(blockText->GetText(), properties.content); QCOMPARE(blockText->GetTextColor(), properties.color);
     QUuid thirdId;
@@ -125,6 +143,253 @@ void BlockWorkflowTests::failedLoadPreservesDocument()
     view.addEntity(new MEntity);
     QVERIFY(!DocumentStorage().save(path, view, library).ok());
     QVERIFY(file.open(QIODevice::ReadOnly)); QCOMPARE(file.readAll(), previous);
+}
+
+void BlockWorkflowTests::selectionWithZoomAndShift()
+{
+    MainWindow window; window.resize(1200, 800); window.show();
+    QTest::qWait(50);
+    auto* view = window.canvas();
+    auto* horizontal = new MLine({-120, 20}, {-60, 20});
+    auto* vertical = new MLine({20, -50}, {20, 10});
+    auto* crossing = new MLine({-140, -40}, {0, -40});
+    view->addEntity(horizontal); view->addEntity(vertical); view->addEntity(crossing);
+    view->setScale(2); view->MoveOrg(37, -23);
+    view->selectEntity();
+    auto at = [view](QPointF p) { return view->WorldtoScreen(p); };
+    // Reverse-direction drag includes a zero-height line but excludes a crossing line.
+    QTest::mousePress(view, Qt::LeftButton, {}, at({-50, 30}));
+    QTest::mouseMove(view, at({-130, -45}));
+    QTest::mouseRelease(view, Qt::LeftButton, {}, at({-130, -45}));
+    QCOMPARE(view->GetSelectedEntityList(), QList<MEntity*>{horizontal});
+    QTest::mouseClick(view, Qt::LeftButton, Qt::ShiftModifier, at({20, -20}));
+    QCOMPARE(view->GetSelectedEntityList().size(), 2);
+    QTest::mouseClick(view, Qt::LeftButton, Qt::ShiftModifier, at({-90, 20}));
+    QCOMPARE(view->GetSelectedEntityList(), QList<MEntity*>{vertical});
+    // Pick at four screen pixels from the line, then verify outside the tolerance.
+    QTest::mouseClick(view, Qt::LeftButton, {}, at({-90, 20}) + QPoint(0, 4));
+    QCOMPARE(view->GetSelectedEntityList(), QList<MEntity*>{horizontal});
+    QTest::mouseClick(view, Qt::LeftButton, {}, at({-90, 20}) + QPoint(0, 8));
+    QVERIFY(view->GetSelectedEntityList().isEmpty());
+    QTest::mousePress(view, Qt::LeftButton, {}, at({-130, 30}));
+    QTest::mouseMove(view, at({30, -60}));
+    QTest::keyClick(view, Qt::Key_Escape);
+    QTest::mouseRelease(view, Qt::LeftButton, {}, at({30, -60}));
+    QVERIFY(view->GetSelectedEntityList().isEmpty());
+    view->setModified(false);
+}
+
+void BlockWorkflowTests::blockSnapshotIsolation()
+{
+    QCADView view; BlockLibrary library;
+    auto* text = new MText;
+    TextProperties original{QStringLiteral("定义时的文字"), QFont("Arial", 12), Qt::blue, QRectF(10, 20, 50, 30)};
+    QVERIFY(TextPropertyService().apply(*text, original).ok()); view.addEntity(text);
+    QUuid definition;
+    QVERIFY(BlockDefinitionService().defineBlock({text, text}, {QStringLiteral("快照"), {10,20}}, library, definition).ok());
+    QCOMPARE(library.definitions.front().entities.size(), 1);
+    auto changed = original; changed.content = QStringLiteral("原件已修改");
+    QVERIFY(TextPropertyService().apply(*text, changed).ok());
+    QUuid instance;
+    QVERIFY(BlockInsertionService().insertAt(view, library, {definition, {100,200}}, instance).ok());
+    auto* block = dynamic_cast<BlockEntity*>(view.GetEntityList().last()); QVERIFY(block);
+    auto* child = dynamic_cast<MText*>(block->children.front().get()); QVERIFY(child);
+    QCOMPARE(child->GetText(), original.content);
+    QCOMPARE(child->GetLeftTopPos(), QPointF(100,200));
+    const auto before = library.definitions.size();
+    QUuid nested;
+    QVERIFY(BlockDefinitionService().defineBlock({block}, {QStringLiteral("嵌套"), {}}, library, nested).ok());
+    QCOMPARE(library.definitions.size(), before + 1); QVERIFY(!nested.isNull());
+    std::unique_ptr<MEntity> tree = std::make_unique<MLine>(QPointF(), QPointF(1,1));
+    for (int level = 0; level < 32; ++level) {
+        auto parent = std::make_unique<BlockEntity>();
+        parent->instance = {QUuid::createUuid(), definition, {}};
+        parent->children.push_back(std::move(tree)); tree = std::move(parent);
+    }
+    EntitySnapshot snapshot;
+    QVERIFY(encodeEntity(*tree, snapshot).ok());
+    std::unique_ptr<MEntity> restored;
+    QVERIFY(decodeEntity(snapshot, restored).ok());
+    auto tooDeep = std::make_unique<BlockEntity>();
+    tooDeep->instance = {QUuid::createUuid(), definition, {}};
+    tooDeep->children.push_back(std::move(tree));
+    QVERIFY(!encodeEntity(*tooDeep, snapshot).ok());
+}
+
+void BlockWorkflowTests::invalidFilesPreserveDocument_data()
+{
+    QTest::addColumn<int>("corruption");
+    QTest::newRow("wrong-magic") << 0;
+    QTest::newRow("unsupported-version") << 1;
+    QTest::newRow("excessive-record-count") << 2;
+    QTest::newRow("trailing-data") << 3;
+}
+
+void BlockWorkflowTests::invalidFilesPreserveDocument()
+{
+    QFETCH(int, corruption);
+    QCADView view; BlockLibrary library;
+    auto* line = new MLine({1,2}, {3,4}); view.addEntity(line); view.AddSelection(line);
+    QUuid id; QVERIFY(BlockDefinitionService().defineBlock({line}, {"existing", {}}, library, id).ok());
+    QTemporaryDir directory; QVERIFY(directory.isValid());
+    const auto path = directory.filePath("corrupt.qbl");
+    QVERIFY(DocumentStorage().save(path, view, library).ok());
+    QFile file(path); QVERIFY(file.open(QIODevice::ReadWrite));
+    if (corruption == 3) { QVERIFY(file.seek(file.size())); QCOMPARE(file.write("extra"), qint64(5)); }
+    else {
+        QVERIFY(file.seek(corruption * 4));
+        QDataStream stream(&file); stream.setVersion(QDataStream::Qt_5_12);
+        stream << quint32(corruption == 0 ? 0 : corruption == 1 ? 999 : 100001);
+    }
+    file.close();
+    QVERIFY(!DocumentStorage().load(path, view, library).ok());
+    QCOMPARE(view.GetEntityList(), QList<MEntity*>{line});
+    QCOMPARE(view.GetSelectedEntityList(), QList<MEntity*>{line});
+    QCOMPARE(library.definitions.front().id, id); QVERIFY(view.isModified());
+}
+
+void BlockWorkflowTests::textPropertiesAndCancellation()
+{
+    MainWindow window; window.resize(1000, 700); window.show(); QTest::qWait(50);
+    auto* view = window.canvas(); auto* text = new MText;
+    TextProperties properties{QStringLiteral("原始中文\n第二行"), QFont("Arial", 12), QColor("#123456"), QRectF(-100, 0, 80, 40)};
+    properties.font.setPointSizeF(17.5); properties.font.setBold(true);
+    properties.font.setItalic(true); properties.font.setUnderline(true);
+    QVERIFY(TextPropertyService().apply(*text, properties).ok()); view->addEntity(text); view->AddSelection(text);
+    view->setModified(false);
+    EntitySnapshot before; QVERIFY(encodeEntity(*text, before).ok());
+    QTimer::singleShot(30, [] {
+        if (auto* dialog = dynamic_cast<TextPropertiesDialog*>(QApplication::activeModalWidget())) {
+            QDir().mkpath("artifacts");
+            dialog->grab().save("artifacts/text-properties.png");
+            dialog->findChild<QPlainTextEdit*>("textContent")->setPlainText(QStringLiteral("取消的修改"));
+            dialog->findChild<QDoubleSpinBox*>("fontSize")->setValue(39.5);
+            dialog->reject();
+        }
+    });
+    window.findChild<QAction*>("textPropertiesAction")->trigger();
+    EntitySnapshot after; QVERIFY(encodeEntity(*text, after).ok());
+    QCOMPARE(after.payload, before.payload); QVERIFY(!view->isModified());
+    auto invalid = properties; invalid.bounds.setWidth(0);
+    QVERIFY(!TextPropertyService().apply(*text, invalid).ok());
+    QVERIFY(encodeEntity(*text, after).ok()); QCOMPARE(after.payload, before.payload);
+    QTimer::singleShot(30, [] {
+        if (auto* dialog = dynamic_cast<TextPropertiesDialog*>(QApplication::activeModalWidget())) {
+            dialog->findChild<QDoubleSpinBox*>("fontSize")->setValue(23.75);
+            dialog->findChild<QDoubleSpinBox*>("textX")->setValue(-150);
+            dialog->findChild<QDoubleSpinBox*>("textWidth")->setValue(125);
+            dialog->accept();
+        }
+    });
+    window.findChild<QAction*>("textPropertiesAction")->trigger();
+    QCOMPARE(text->GetFont().pointSizeF(), 23.75); QCOMPARE(text->GetLeftTopPos().x(), -150.0);
+    QCOMPARE(text->GetRightBottomPos().x(), -25.0); QCOMPARE(text->GetTextColor(), properties.color);
+    QVERIFY(text->GetFont().bold()); QVERIFY(text->GetFont().italic()); QVERIFY(text->GetFont().underline());
+    QVERIFY(view->isModified()); view->setModified(false);
+}
+
+void BlockWorkflowTests::nestedTransformsAndTextRoundTrip()
+{
+    MainWindow window; window.resize(1000,700); window.show(); QTest::qWait(50);
+    auto* view = window.canvas(); BlockLibrary library;
+    auto* line = new MLine({0,0}, {10,0}); view->addEntity(line);
+    auto* text = new MText;
+    QVERIFY(TextPropertyService().apply(*text, {QStringLiteral("模板"), QFont("Arial",12), Qt::blue, QRectF(0,0,10,5)}).ok());
+    view->addEntity(text);
+    QUuid baseId;
+    QVERIFY(BlockDefinitionService().defineBlock({line,text}, {"base", {}}, library, baseId).ok());
+    QUuid firstId;
+    QVERIFY(BlockInsertionService().insertAt(*view, library, {baseId,{100,200},90,2}, firstId).ok());
+    auto* first = dynamic_cast<BlockEntity*>(view->GetEntityList().last()); QVERIFY(first);
+    const auto mapped = first->worldTransform().map(QPointF(110,200));
+    QVERIFY(QLineF(mapped, QPointF(100,220)).length() < 1e-8);
+    QRectF box; first->GetBox(box);
+    QVERIFY(QLineF(box.topLeft(), QPointF(90,200)).length() < 1e-8);
+    QVERIFY(QLineF(box.bottomRight(), QPointF(100,220)).length() < 1e-8);
+    view->zoomRect(QRectF(80,180,50,50)); QTest::qWait(50);
+    const auto rendered = view->grab().toImage();
+    QDir().mkpath("artifacts"); rendered.save("artifacts/rotated-block.png");
+    // Probe below the text glyphs so different native/offscreen font metrics
+    // cannot hide the line with blue text at the rectangle's center.
+    const auto pixel = view->WorldtoScreen({100,205});
+    bool ink = false;
+    for (int dx = -2; dx <= 2; ++dx)
+        for (int dy = -2; dy <= 2; ++dy)
+            if (rendered.pixelColor(pixel + QPoint(dx,dy)) == QColor(Qt::black)) ink = true;
+    QVERIFY2(ink, "Rotated line must actually render at its transformed position.");
+    QUuid outerId;
+    QVERIFY(BlockDefinitionService().defineBlock({first}, {"outer", {100,200}}, library, outerId).ok());
+    QUuid outerInstance;
+    QVERIFY(BlockInsertionService().insertAt(*view, library, {outerId,{400,500},-90,.5}, outerInstance).ok());
+    auto* outer = dynamic_cast<BlockEntity*>(view->GetEntityList().last()); QVERIFY(outer);
+    outer->GetBox(box);
+    QVERIFY(QLineF(box.topLeft(), QPointF(400,500)).length() < 1e-8);
+    QVERIFY(QLineF(box.bottomRight(), QPointF(410,505)).length() < 1e-8);
+    view->ClearSelections(); view->AddSelection(outer);
+    QTimer dialogs;
+    connect(&dialogs, &QTimer::timeout, [] {
+        if (auto* input = qobject_cast<QInputDialog*>(QApplication::activeModalWidget())) {
+            input->grab().save("artifacts/nested-text-selector.png"); input->accept();
+        }
+        else if (auto* properties = dynamic_cast<TextPropertiesDialog*>(QApplication::activeModalWidget())) {
+            properties->findChild<QPlainTextEdit*>("textContent")->setPlainText(QStringLiteral("仅这个嵌套实例的文字"));
+            properties->findChild<QDoubleSpinBox*>("fontSize")->setValue(19.25);
+            properties->accept();
+        }
+    });
+    dialogs.start(20);
+    window.findChild<QAction*>("textPropertiesAction")->trigger(); dialogs.stop();
+    QVector<MText*> texts; QStringList labels; outer->collectTexts(texts,labels);
+    QCOMPARE(texts.size(), 1); QCOMPARE(texts.front()->GetText(), QStringLiteral("仅这个嵌套实例的文字"));
+    QVector<MText*> unchanged; QStringList originalLabels; first->collectTexts(unchanged, originalLabels);
+    QCOMPARE(unchanged.front()->GetText(), QStringLiteral("模板"));
+    QTemporaryDir directory; const auto path = directory.filePath("nested.qbl");
+    QVERIFY(DocumentStorage().save(path, *view, library).ok());
+    QCADView loaded; BlockLibrary loadedLibrary;
+    QVERIFY(DocumentStorage().load(path, loaded, loadedLibrary).ok());
+    auto* restored = dynamic_cast<BlockEntity*>(loaded.GetEntityList().last()); QVERIFY(restored);
+    EntitySnapshot expected, actual;
+    QVERIFY(encodeEntity(*outer,expected).ok()); QVERIFY(encodeEntity(*restored,actual).ok());
+    QCOMPARE(actual.payload,expected.payload);
+    texts.clear(); labels.clear(); restored->collectTexts(texts, labels);
+    QCOMPARE(texts.front()->GetText(), QStringLiteral("仅这个嵌套实例的文字"));
+    QCOMPARE(texts.front()->GetFont().pointSizeF(), 19.25);
+    view->ClearSelections(); view->AddSelection(outer);
+    QTimer::singleShot(20, [] {
+        if (auto* dialog = qobject_cast<QDialog*>(QApplication::activeModalWidget())) {
+            dialog->findChild<QDoubleSpinBox*>("blockRotation")->setValue(45);
+            dialog->findChild<QDoubleSpinBox*>("blockScale")->setValue(3);
+            dialog->grab().save("artifacts/transform-settings.png");
+            dialog->accept();
+        }
+    });
+    window.findChild<QAction*>("blockTransformAction")->trigger();
+    QCOMPARE(outer->instance.rotationDegrees, 45.0); QCOMPARE(outer->instance.scale, 3.0);
+    QVERIFY(DocumentStorage().save(path, *view, library).ok());
+    QVERIFY(DocumentStorage().load(path, loaded, loadedLibrary).ok());
+    restored = dynamic_cast<BlockEntity*>(loaded.GetEntityList().last()); QVERIFY(restored);
+    QCOMPARE(restored->instance.rotationDegrees, 45.0); QCOMPARE(restored->instance.scale, 3.0);
+    outer->GetBox(box); view->zoomRect(box.adjusted(-10,-10,10,10));
+    view->ClearSelections(); QTest::qWait(50);
+    QVERIFY(window.grab().save("artifacts/nested-block-workflow.png"));
+    const auto count = view->GetEntityList().size(); QUuid bad;
+    QVERIFY(!BlockInsertionService().insertAt(*view, library, {baseId, {}, 0, 0}, bad).ok());
+    QCOMPARE(view->GetEntityList().size(), count); QVERIFY(bad.isNull());
+    QRectF beforeMove; restored->GetBox(beforeMove);
+    restored->Move({400,500}, {450,550}); restored->GetBox(box);
+    QVERIFY(QLineF(box.topLeft(), beforeMove.topLeft() + QPointF(50,50)).length() < 1e-8);
+    // Older v1 files store references and placement without per-instance snapshots.
+    const auto legacy = directory.filePath("legacy.qbl"); QFile file(legacy);
+    QVERIFY(file.open(QIODevice::WriteOnly)); QDataStream stream(&file); stream.setVersion(QDataStream::Qt_5_12);
+    stream << quint32(0x51424c4b) << quint32(1) << quint32(1);
+    const auto& definition = library.definitions.front();
+    stream << definition.id << definition.name << definition.sourceBasePoint << quint32(definition.entities.size());
+    for (const auto& snapshot : definition.entities) stream << qint32(snapshot.entityType) << snapshot.payload;
+    stream << quint32(1) << qint32(etBlock) << firstId << baseId << QPointF(50,60); file.close();
+    QVERIFY(DocumentStorage().load(legacy, loaded, loadedLibrary).ok());
+    restored = dynamic_cast<BlockEntity*>(loaded.GetEntityList().front()); QVERIFY(restored);
+    QCOMPARE(restored->instance.position, QPointF(50,60)); QCOMPARE(restored->instance.scale,1.0);
+    view->setModified(false);
 }
 
 void BlockWorkflowTests::windowWorkflow()
@@ -167,6 +432,8 @@ void BlockWorkflowTests::windowWorkflow()
     QTest::mouseMove(view, at({-185,65}));
     QTest::mouseRelease(view, Qt::LeftButton, {}, at({-185,65}));
     QCOMPARE(view->GetSelectedEntityList().size(), 3);
+    QDir().mkpath("artifacts");
+    QVERIFY(window.grab().save("artifacts/selection.png"));
     QTimer::singleShot(30, [] {
         if (auto* dialog = qobject_cast<QInputDialog*>(QApplication::activeModalWidget())) {
             dialog->setTextValue(QStringLiteral("设备组合")); dialog->accept();
@@ -176,12 +443,24 @@ void BlockWorkflowTests::windowWorkflow()
     QTest::mouseClick(view, Qt::LeftButton, {}, at({-400,80}));
     QCoreApplication::processEvents();
     QCOMPARE(window.blockLibrary().definitions.size(), 1);
+    QVERIFY(window.grab().save("artifacts/block-defined.png"));
     QTimer::singleShot(30, [] {
         if (auto* dialog = qobject_cast<QInputDialog*>(QApplication::activeModalWidget())) dialog->accept();
     });
+    QTimer transformDialog;
+    connect(&transformDialog, &QTimer::timeout, [] {
+        auto* dialog = qobject_cast<QDialog*>(QApplication::activeModalWidget());
+        if (dialog && dialog->objectName() == "blockTransformDialog") dialog->accept();
+    });
+    transformDialog.start(20);
     window.findChild<QAction*>("insertBlockAction")->trigger();
-    QTest::mouseMove(view, at({-100,80}));
-    QVERIFY(view->hasPreview());
+    transformDialog.stop();
+    // Deliver hover in Qt coordinates: native QTest cursor warps can be coalesced
+    // after modal dialogs, whereas drag events above also have a pressed button.
+    QMouseEvent hover(QEvent::MouseMove, at({-100,80}), Qt::NoButton, Qt::NoButton, Qt::NoModifier);
+    QApplication::sendEvent(view, &hover);
+    QTRY_VERIFY(view->hasPreview());
+    QVERIFY(window.grab().save("artifacts/insert-preview.png"));
     QTest::mouseClick(view, Qt::LeftButton, {}, at({-100,80}));
     QTest::mouseClick(view, Qt::LeftButton, {}, at({150,-90}));
     QTest::keyClick(view, Qt::Key_Escape);

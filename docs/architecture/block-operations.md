@@ -30,22 +30,22 @@
 
 OperationResult 的 None 为成功，其余区分主动取消、参数错误、空选择、重名、不支持的图元、块不存在、IO 错误和格式错误。未完成的骨架入口已全部替换。
 
-TextProperties 是完整属性集，不是部分更新；校验通过后一次性修改。独立 Text 支持 Unicode、多行、本机 QFontDatabase 字体列表、0.1–10000 pt 可输入字号、字体样式、颜色和归一化文本框；取消对话框不应用。QCADView 在选择命令下优先处理 Text 双击，直接打开同一个属性编辑对话框。
+TextProperties 是完整属性集，不是部分更新；校验通过后一次性修改。独立 Text 及块内选定 Text 支持 Unicode、多行、本机 QFontDatabase 字体列表、0.1–10000 pt 可输入字号、字体样式、颜色和归一化文本框；取消对话框不应用。独立 Text 支持双击；块内 Text 通过选中块后点击 Text 属性或 Ctrl+E 选择层级路径。
 
 QcadBlockActions 的 defineBlock/beginInsertBlock 返回成功表示交互已启动；真正定义或插入在 PointCommand 接收到画布位置时执行。提交失败显示消息，成功后刷新并标记文档已修改。
 
 首次插入后命令保留，可连续提交。Esc/右键结束；切换工具也清除预览。定义成功后通过事件队列切回选择命令，避免在正在执行的命令回调中销毁自身。
 
-## qbl 文件格式 v1
+## qbl 文件格式 v2（兼容读取 v1）
 
 使用 QDataStream，固定流版本为 Qt_5_12，默认大端序。没有裸写实体内存或指针。
 
-1. 文件头：quint32 magic `0x51424c4b`（QBLK）、quint32 格式版本 `1`。
+1. 文件头：quint32 magic `0x51424c4b`（QBLK）、quint32 格式版本 `2`。
 2. 块库：quint32 定义数；每个定义为 QUuid、QString 名称、QPointF 原基点、quint32 子图元数；每个子图元是 qint32 类型和 QByteArray 载荷。
-3. 场景：quint32 实体数；每个实体先写 qint32 类型。普通实体接 QByteArray 载荷；etBlock 接 QUuid 实例 ID、QUuid 定义 ID 和 QPointF 插入位置。
+3. 场景：quint32 实体数；每个实体先写 qint32 类型，再写 QByteArray 载荷。块载荷为画笔/画刷、实例 UUID、定义 UUID、位置、角度、等比缩放、子图元数量及递归快照。子块作为自包含快照，无循环定义引用。v1 分支继续读取实例 UUID、定义 UUID、位置，并按定义重建。
 4. 普通实体载荷先保存 QPen/QBrush，再由相应图元 Serialize 保存几何数据；Text 额外包含 QString 内容、QFont、QColor，保持复制/重开后的完整属性。
 
-支持直线、矩形、圆、圆弧、椭圆、多边形、Text。块定义中不允许块，避免静默拆散或递归引用。首版限制单文件 128 MiB、各级记录数 100000；这是加载保护，不是性能承诺。
+支持直线、矩形、圆、圆弧、椭圆、多边形、Text 和嵌套块。递归编解码限制 32 层，单文件 128 MiB、各级记录数 100000；这是加载保护，不是性能承诺。块实例保存完整快照，以保留单实例文字修改。
 
 保存先构建并验证完整数据，再由 QSaveFile 替换目标。加载先构建临时图元和块库，检查版本、类型、流状态、UUID 唯一性和引用完整性；全部通过后替换当前文档。失败保留当前图元、选择、块库和目标文件。
 
@@ -61,6 +61,8 @@ QcadBlockActions 的 defineBlock/beginInsertBlock 返回成功表示交互已启
 
 ## 验证和后续边界
 
-tests/block_workflow_tests.cpp 包含三项业务验证：完整文档往返、失败时状态保护、Qt 窗口真实交互。窗口流程自动驱动绘制/拖框/Text 对话框/基点/插入命令，并生成截图及示例文件。采用离屏 QPA，Windows 测试显式加载系统微软雅黑；离屏插件的布局提示不代表本机 Windows 窗口异常。
+tests/block_workflow_tests.cpp 同时在 offscreen 和 Windows 原生 QPA 运行，分别输出日志和截图。验证完整图元数据往返、失败时状态保护、缩放/Shift 选择、编辑取消、嵌套实例的旋转缩放/文字编辑及 v1 兼容读取。
 
-未实现嵌套块、旋转/缩放插入、块定义内部编辑和实例文本覆盖，也未兼容 DXF/DWG 或原课程 .cad 示例。后续新增能力应扩展对应模块及文件版本，避免将所有逻辑堆回 mainwindow.cpp。
+块变换为 T(position)·R(angle)·S(scale)·T(-position)，子图元仍保留变换前坐标。绘制时将世界变换共轭到屏幕坐标，并与父块绘制变换组合；全部图元使用同一个绘制变换，因此矩形、椭圆和文字的方向均保持正确。GetBox 逐层变换轴对齐包围盒。移动同时平移子图元和变换基点。
+
+Text 属性入口可递归列出选中块的内部文字，通过路径选择子图元，只修改当前实例快照。块定义不会同步改变。不支持非等比缩放、镜像、DXF/DWG 或原课程 .cad；编辑块定义本身需重新定义新名称。

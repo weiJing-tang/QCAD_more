@@ -1,9 +1,12 @@
 #include "storage/EntityCodec.h"
 #include <QBuffer>
 #include <cmath>
+#include "blocks/BlockEntity.h"
 namespace qcad_more {
 bool finitePoint(const QPointF& p) { return std::isfinite(p.x()) && std::isfinite(p.y()); }
 namespace {
+thread_local int codecDepth = 0;
+struct DepthGuard { DepthGuard() { ++codecDepth; } ~DepthGuard() { --codecDepth; } };
 std::unique_ptr<MEntity> makeEntity(int type)
 {
     switch (type) {
@@ -14,14 +17,17 @@ std::unique_ptr<MEntity> makeEntity(int type)
     case etEllipse: return std::make_unique<MEllipse>();
     case etPolygon: return std::make_unique<MPolygon>();
     case etText: return std::make_unique<MText>();
+    case etBlock: return std::make_unique<BlockEntity>();
     default: return {};
     }
 }
 }
 OperationResult encodeEntity(MEntity& entity, EntitySnapshot& output)
 {
+    DepthGuard depth;
+    if (codecDepth > 33) return {ErrorCode::InvalidInput, QStringLiteral("嵌套块层数不能超过 32 层。")};
     if (!makeEntity(entity.GetType()))
-        return {ErrorCode::UnsupportedEntity, QStringLiteral("该图元暂不支持；块内不能再包含块。")};
+        return {ErrorCode::UnsupportedEntity, QStringLiteral("该图元暂不支持。")};
     EntitySnapshot snapshot;
     snapshot.entityType = entity.GetType();
     QDataStream stream(&snapshot.payload, QIODevice::WriteOnly);
@@ -34,6 +40,8 @@ OperationResult encodeEntity(MEntity& entity, EntitySnapshot& output)
 }
 OperationResult decodeEntity(const EntitySnapshot& snapshot, std::unique_ptr<MEntity>& output)
 {
+    DepthGuard depth;
+    if (codecDepth > 33) return {ErrorCode::InvalidFormat, QStringLiteral("嵌套块层数超过限制。")};
     auto entity = makeEntity(snapshot.entityType);
     if (!entity) return {ErrorCode::UnsupportedEntity, QStringLiteral("文件包含不支持的图元。")};
     QDataStream stream(snapshot.payload);

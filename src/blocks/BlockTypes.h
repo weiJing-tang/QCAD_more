@@ -9,7 +9,7 @@
 namespace qcad_more {
 
 // Value snapshots own their bytes; they never own or retain live MEntity pointers.
-// Payloads use EntityCodec and QDataStream::Qt_5_12 under document format v1.
+// Payloads use EntityCodec and QDataStream::Qt_5_12; v2 supports recursive blocks.
 struct EntitySnapshot {
     int entityType = 0; // Maps to EEntityType in the course project's ENTITY.H.
     QByteArray payload;
@@ -34,14 +34,18 @@ struct DefineBlockRequest {
 struct InsertBlockRequest {
     QUuid definitionId;
     QPointF position; // World coordinates to which the block origin is mapped.
+    double rotationDegrees = 0;
+    double scale = 1;
 };
 
-// Block entities persist this reference instead of duplicating definitions.
+// Instance metadata accompanies a private recursive snapshot in document v2.
 // Each successful insertion creates its own non-null instanceId.
 struct BlockInstance {
     QUuid instanceId;
     QUuid definitionId;
     QPointF position;
+    double rotationDegrees = 0;
+    double scale = 1;
 };
 
 } // namespace qcad_more

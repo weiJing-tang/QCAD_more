@@ -78,6 +78,7 @@ QPointF MRectangle::GetRightBottomPos()
 void MRectangle::Draw(QCADView* pView, int drawMode)
 {
 	QPainter pDC(pView);
+    pDC.setWorldTransform(pView->drawingTransform);
 	if (drawMode == dmSelect)
 	{
 		QPen pen(Qt::DashLine);
