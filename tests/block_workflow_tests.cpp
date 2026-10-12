@@ -24,6 +24,8 @@ private slots:
     void invalidFilesPreserveDocument();
     void textPropertiesAndCancellation();
     void nestedTransformsAndTextRoundTrip();
+    void dragBlocksAndPersist();
+    void dragCancellationAndSelection();
     void windowWorkflow();
 };
 
@@ -389,6 +391,133 @@ void BlockWorkflowTests::nestedTransformsAndTextRoundTrip()
     QVERIFY(DocumentStorage().load(legacy, loaded, loadedLibrary).ok());
     restored = dynamic_cast<BlockEntity*>(loaded.GetEntityList().front()); QVERIFY(restored);
     QCOMPARE(restored->instance.position, QPointF(50,60)); QCOMPARE(restored->instance.scale,1.0);
+    view->setModified(false);
+}
+
+void BlockWorkflowTests::dragBlocksAndPersist()
+{
+    MainWindow window; window.resize(1200,800); window.show(); QTest::qWait(50);
+    auto* view = window.canvas(); auto& library = window.blockLibrary();
+    auto* rect = new MRectangle({0,0},{60,40}); view->addEntity(rect);
+    auto* text = new MText;
+    QVERIFY(TextPropertyService().apply(*text,
+        {QStringLiteral("拖动的文字"),QFont("Arial",10),Qt::blue,QRectF(5,10,45,20)}).ok());
+    view->addEntity(text);
+    QUuid base;
+    QVERIFY(BlockDefinitionService().defineBlock({rect,text},{"drag-base",{}},library,base).ok());
+    QUuid id;
+    QVERIFY(BlockInsertionService().insertAt(*view,library,{base,{-200,60},30,1.5},id).ok());
+    auto* child = dynamic_cast<BlockEntity*>(view->GetEntityList().last()); QVERIFY(child);
+    QUuid nested;
+    QVERIFY(BlockDefinitionService().defineBlock({child},{"drag-nested",{-200,60}},library,nested).ok());
+    QVERIFY(BlockInsertionService().insertAt(*view,library,{nested,{-180,-70},-15,.75},id).ok());
+    auto* first = dynamic_cast<BlockEntity*>(view->GetEntityList().last()); QVERIFY(first);
+    QVERIFY(BlockInsertionService().insertAt(*view,library,{base,{150,-70}},id).ok());
+    auto* second = dynamic_cast<BlockEntity*>(view->GetEntityList().last()); QVERIFY(second);
+    view->setScale(1.5); view->MoveOrg(23,-17); view->selectEntity(); view->ClearSelections();
+    view->setModified(false);
+    const auto firstPosition = first->instance.position;
+    auto at = [view](QPointF point){return view->WorldtoScreen(point);};
+    QRectF bounds; first->GetBox(bounds);
+    const QPoint press = at(bounds.center()), release = press + QPoint(90,45);
+    const auto delta = view->ScreentoWorld(release) - view->ScreentoWorld(press);
+    EntitySnapshot before;
+    QVERIFY(encodeEntity(*first,before).ok());
+    QTest::mousePress(view,Qt::LeftButton,{},press);
+    QCOMPARE(view->GetSelectedEntityList(),QList<MEntity*>{first});
+    QMouseEvent motion(QEvent::MouseMove,press+QPoint(60,30),Qt::NoButton,Qt::LeftButton,Qt::NoModifier);
+    QApplication::sendEvent(view,&motion);
+    QVERIFY(view->hasPreview()); QVERIFY(!view->isModified());
+    EntitySnapshot during;
+    QVERIFY(encodeEntity(*first,during).ok()); QCOMPARE(during.payload,before.payload);
+    QCOMPARE(view->cursor().shape(),Qt::ClosedHandCursor);
+    QTest::mouseRelease(view,Qt::LeftButton,{},release);
+    QVERIFY(!view->hasPreview()); QVERIFY(view->isModified());
+    QCOMPARE(first->instance.position,firstPosition+delta);
+    QCOMPARE(first->instance.rotationDegrees,-15.0); QCOMPARE(first->instance.scale,.75);
+    QVERIFY(view->cursor().shape()!=Qt::ClosedHandCursor);
+    // Drag a selected group: both instances move by the same world-space delta.
+    view->AddSelection(second);
+    first->GetBox(bounds);
+    const QPoint groupPress=at(bounds.center()), groupRelease=groupPress+QPoint(-30,-60);
+    const auto groupDelta=view->ScreentoWorld(groupRelease)-view->ScreentoWorld(groupPress);
+    const auto firstBefore=first->instance.position, secondBefore=second->instance.position;
+    QTest::mousePress(view,Qt::LeftButton,{},groupPress);
+    QMouseEvent groupMotion(QEvent::MouseMove,groupRelease,Qt::NoButton,Qt::LeftButton,Qt::NoModifier);
+    QApplication::sendEvent(view,&groupMotion);
+    QVERIFY(view->hasPreview());
+    QTest::mouseRelease(view,Qt::LeftButton,{},groupRelease);
+    QCOMPARE(first->instance.position,firstBefore+groupDelta);
+    QCOMPARE(second->instance.position,secondBefore+groupDelta);
+    QCOMPARE(view->GetSelectedEntityList().size(),2);
+    QVector<MText*> texts; QStringList labels; first->collectTexts(texts,labels);
+    QCOMPARE(texts.front()->GetText(),QStringLiteral("拖动的文字"));
+    QTemporaryDir directory; QVERIFY(directory.isValid());
+    const auto file=directory.filePath("drag.qbl");
+    QVERIFY(DocumentStorage().save(file,*view,library).ok());
+    QCADView loaded; BlockLibrary restoredLibrary;
+    QVERIFY(DocumentStorage().load(file,loaded,restoredLibrary).ok());
+    QCOMPARE(loaded.GetEntityList().size(),view->GetEntityList().size());
+    for (int i=0;i<view->GetEntityList().size();++i) {
+        EntitySnapshot expected,actual;
+        QVERIFY(encodeEntity(*view->GetEntityList()[i],expected).ok());
+        QVERIFY(encodeEntity(*loaded.GetEntityList()[i],actual).ok());
+        QCOMPARE(actual.payload,expected.payload);
+    }
+    QDir().mkpath("artifacts");
+    QVERIFY(window.grab().save("artifacts/dragged-blocks.png"));
+    view->setModified(false);
+}
+
+void BlockWorkflowTests::dragCancellationAndSelection()
+{
+    MainWindow window; window.resize(1100,750); window.show(); QTest::qWait(50);
+    auto* view=window.canvas(); auto& library=window.blockLibrary();
+    auto* rect=new MRectangle({0,0},{50,40}); view->addEntity(rect);
+    QUuid definition,instance;
+    QVERIFY(BlockDefinitionService().defineBlock({rect},{"cancel-drag",{}},library,definition).ok());
+    QVERIFY(BlockInsertionService().insertAt(*view,library,{definition,{-150,40}},instance).ok());
+    auto* block=dynamic_cast<BlockEntity*>(view->GetEntityList().last()); QVERIFY(block);
+    view->selectEntity(); view->AddSelection(block); view->setModified(false);
+    EntitySnapshot original; QVERIFY(encodeEntity(*block,original).ok());
+    const QPoint press=view->WorldtoScreen({-125,60}), destination=press+QPoint(60,40);
+    auto beginDrag=[&] {
+        QTest::mousePress(view,Qt::LeftButton,{},press);
+        QMouseEvent motion(QEvent::MouseMove,destination,Qt::NoButton,Qt::LeftButton,Qt::NoModifier);
+        QApplication::sendEvent(view,&motion);
+    };
+    for(int cancelMode=0;cancelMode<3;++cancelMode) {
+        view->selectEntity(); beginDrag(); QVERIFY(view->hasPreview());
+        if(cancelMode==0) QTest::keyClick(view,Qt::Key_Escape);
+        else if(cancelMode==1) QTest::mouseClick(view,Qt::RightButton,{},destination);
+        else view->drawLine();
+        QVERIFY(!view->hasPreview()); QVERIFY(!view->isModified());
+        QTest::mouseRelease(view,Qt::LeftButton,{},destination);
+        EntitySnapshot unchanged; QVERIFY(encodeEntity(*block,unchanged).ok());
+        QCOMPARE(unchanged.payload,original.payload);
+        QVERIFY(view->cursor().shape()!=Qt::ClosedHandCursor);
+    }
+    view->selectEntity();
+    // Click jitter is below the platform drag threshold and must not move the block.
+    QTest::mousePress(view,Qt::LeftButton,{},press);
+    QTest::mouseRelease(view,Qt::LeftButton,{},press+QPoint(1,1));
+    QVERIFY(!view->hasPreview()); QVERIFY(!view->isModified());
+    QCOMPARE(view->GetSelectedEntityList(),QList<MEntity*>{block});
+    QTest::mouseClick(view,Qt::LeftButton,Qt::ShiftModifier,press);
+    QVERIFY(view->GetSelectedEntityList().isEmpty());
+    QTest::mouseClick(view,Qt::LeftButton,Qt::ShiftModifier,press);
+    QCOMPARE(view->GetSelectedEntityList(),QList<MEntity*>{block});
+    // Starting in empty space still performs rectangle selection of the block.
+    const QPoint from=view->WorldtoScreen({-170,100}), to=view->WorldtoScreen({-80,20});
+    view->ClearSelections();
+    QTest::mousePress(view,Qt::LeftButton,{},from);
+    QMouseEvent boxMove(QEvent::MouseMove,to,Qt::NoButton,Qt::LeftButton,Qt::NoModifier);
+    QApplication::sendEvent(view,&boxMove);
+    QVERIFY(!view->hasPreview());
+    QTest::mouseRelease(view,Qt::LeftButton,{},to);
+    QCOMPARE(view->GetSelectedEntityList(),QList<MEntity*>{block});
+    view->setModified(true); beginDrag(); QTest::keyClick(view,Qt::Key_Escape);
+    QVERIFY(view->isModified()); QTest::mouseRelease(view,Qt::LeftButton,{},destination);
     view->setModified(false);
 }
 

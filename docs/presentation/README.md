@@ -4,11 +4,11 @@
 
 ## 功能确认
 
-选择复合图形并定义块、Text 属性编辑、指定位置插入块和存储均已实现。扩展包括嵌套块、当前实例内部文字编辑、旋转及等比缩放。
+选择复合图形并定义块、Text 属性编辑、指定位置插入块和存储均已实现。扩展包括嵌套块、当前实例内部文字编辑、旋转、等比缩放和按住左键直接拖动块。
 
 ## 实测结果
 
-2026-10-12 执行 `scripts/build.ps1 -Check`：Release 构建成功，CTest 2/2 通过。offscreen 和 Windows 原生模式各 13 passed、0 failed、0 skipped；每组包含初始化/清理、七个非参数化业务测试、文件损坏的四组参数化输入，并非 26 个不同业务测试。
+2026-10-12 执行 `scripts/build.ps1 -Check`：Release 构建成功，CTest 2/2 通过。offscreen 和 Windows 原生模式各 15 passed、0 failed、0 skipped；每组包含初始化/清理、九个非参数化业务测试、文件损坏的四组参数化输入，并非 30 个不同业务测试。新增拖动测试验证嵌套与变换块、缩放位移、多选、松开提交、保存恢复、Esc/右键/工具切换取消、小幅点击抖动及 Shift/框选回归。
 
 - [Windows 原生日志](test-results-windows.txt)
 - [离屏日志](test-results-offscreen.txt)
@@ -26,6 +26,7 @@
 | assets/insert-preview.png | 插入临时预览，不增加正式图元 |
 | assets/transform-settings.png | 已有实例的旋转和等比缩放 |
 | assets/nested-text-selector.png | 按层级路径选择嵌套块中的文字 |
+| assets/dragged-blocks.png | 嵌套块与普通块多选拖动后的结果 |
 
 算法与操作详见 [架构说明](../architecture/block-operations.md) 和 [使用指南](../usage.md)。代码验证位于 `tests/block_workflow_tests.cpp`。修改测试后可重新运行构建检查，从 `build/cmake/native-tests/artifacts/` 更新对应截图。
 

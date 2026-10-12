@@ -36,6 +36,8 @@ QcadBlockActions 的 defineBlock/beginInsertBlock 返回成功表示交互已启
 
 首次插入后命令保留，可连续提交。Esc/右键结束；切换工具也清除预览。定义成功后通过事件队列切回选择命令，避免在正在执行的命令回调中销毁自身。
 
+选择状态下，左键命中最上层块且未按 Shift 时进入拖动候选，按住选中块可移动整个选择集。超过 QApplication::startDragDistance 后，将选择集深复制为一个临时预览组合，隐藏原件的绘制，但不改写原图元数据。世界位移为 `ScreentoWorld(current) - ScreentoWorld(press)`；预览跟随位移更新。松开时对原选择集调用 Move(origin, delta)，标记修改并释放预览；取消只释放预览与恢复光标，原文档数据及修改状态不变。空白/普通图元起手和 Shift 继续使用原框选/点选流程。
+
 ## qbl 文件格式 v2（兼容读取 v1）
 
 使用 QDataStream，固定流版本为 Qt_5_12，默认大端序。没有裸写实体内存或指针。

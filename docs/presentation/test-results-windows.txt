@@ -11,7 +11,9 @@ PASS   : BlockWorkflowTests::invalidFilesPreserveDocument(excessive-record-count
 PASS   : BlockWorkflowTests::invalidFilesPreserveDocument(trailing-data)
 PASS   : BlockWorkflowTests::textPropertiesAndCancellation()
 PASS   : BlockWorkflowTests::nestedTransformsAndTextRoundTrip()
+PASS   : BlockWorkflowTests::dragBlocksAndPersist()
+PASS   : BlockWorkflowTests::dragCancellationAndSelection()
 PASS   : BlockWorkflowTests::windowWorkflow()
 PASS   : BlockWorkflowTests::cleanupTestCase()
-Totals: 13 passed, 0 failed, 0 skipped, 0 blacklisted, 1750ms
+Totals: 15 passed, 0 failed, 0 skipped, 0 blacklisted, 1981ms
 ********* Finished testing of BlockWorkflowTests *********

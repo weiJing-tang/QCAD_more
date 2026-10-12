@@ -17,6 +17,7 @@ private:
     QList<MEntity*> m_SelectEntityList;
     MCommand* m_pCmd;
     std::unique_ptr<MEntity> preview_;
+    QList<MEntity*> previewHiddenEntities_;
     bool modified_ = false;
 
 public:
@@ -35,7 +36,7 @@ protected:
 
 public:
     void setCommand(MCommand* command);
-    void setPreview(std::unique_ptr<MEntity> entity);
+    void setPreview(std::unique_ptr<MEntity> entity, QList<MEntity*> hiddenEntities = {});
     bool hasPreview() const { return bool(preview_); }
     void replaceEntities(QList<MEntity*> entities);
     void setModified(bool modified);

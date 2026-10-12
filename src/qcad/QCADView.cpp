@@ -93,6 +93,7 @@ QCADView::~QCADView()
     //绘制全部实体
 	foreach(MEntity * pEnt, m_EntityList)
 	{
+        if (previewHiddenEntities_.contains(pEnt)) continue;
 		//如果实体在选择集中，则显示状态
 		if (!m_SelectEntityList.contains(pEnt))
 		{
@@ -367,12 +368,14 @@ void QCADView::setCommand(MCommand* command)
     delete m_pCmd;
     m_pCmd = command;
     preview_.reset();
+    previewHiddenEntities_.clear();
     setFocus();
     update();
 }
-void QCADView::setPreview(std::unique_ptr<MEntity> entity)
+void QCADView::setPreview(std::unique_ptr<MEntity> entity, QList<MEntity*> hiddenEntities)
 {
     preview_ = std::move(entity);
+    previewHiddenEntities_ = preview_ ? std::move(hiddenEntities) : QList<MEntity*>{};
     update();
 }
 void QCADView::replaceEntities(QList<MEntity*> entities)

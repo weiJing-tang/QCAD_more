@@ -22,6 +22,10 @@ QWARN  : BlockWorkflowTests::nestedTransformsAndTextRoundTrip() This plugin does
 QWARN  : BlockWorkflowTests::nestedTransformsAndTextRoundTrip() This plugin does not support propagateSizeHints()
 QWARN  : BlockWorkflowTests::nestedTransformsAndTextRoundTrip() This plugin does not support propagateSizeHints()
 PASS   : BlockWorkflowTests::nestedTransformsAndTextRoundTrip()
+QWARN  : BlockWorkflowTests::dragBlocksAndPersist() This plugin does not support propagateSizeHints()
+PASS   : BlockWorkflowTests::dragBlocksAndPersist()
+QWARN  : BlockWorkflowTests::dragCancellationAndSelection() This plugin does not support propagateSizeHints()
+PASS   : BlockWorkflowTests::dragCancellationAndSelection()
 QWARN  : BlockWorkflowTests::windowWorkflow() This plugin does not support propagateSizeHints()
 QWARN  : BlockWorkflowTests::windowWorkflow() This plugin does not support propagateSizeHints()
 QWARN  : BlockWorkflowTests::windowWorkflow() This plugin does not support propagateSizeHints()
@@ -33,5 +37,5 @@ QWARN  : BlockWorkflowTests::windowWorkflow() This plugin does not support propa
 QWARN  : BlockWorkflowTests::windowWorkflow() This plugin does not support propagateSizeHints()
 PASS   : BlockWorkflowTests::windowWorkflow()
 PASS   : BlockWorkflowTests::cleanupTestCase()
-Totals: 13 passed, 0 failed, 0 skipped, 0 blacklisted, 1096ms
+Totals: 15 passed, 0 failed, 0 skipped, 0 blacklisted, 1226ms
 ********* Finished testing of BlockWorkflowTests *********
