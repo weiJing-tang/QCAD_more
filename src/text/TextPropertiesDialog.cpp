@@ -33,7 +33,7 @@ TextPropertiesDialog::TextPropertiesDialog(const TextProperties& p, QWidget* par
     form->addRow(QStringLiteral("颜色"), colorButton_);
     x_ = spin("textX", p.bounds.x(), -1e9, 1e9); y_ = spin("textY", p.bounds.y(), -1e9, 1e9);
     width_ = spin("textWidth", p.bounds.width(), .001, 1e9); height_ = spin("textHeight", p.bounds.height(), .001, 1e9);
-    form->addRow(QStringLiteral("X（世界坐标）"), x_); form->addRow(QStringLiteral("Y（较小值）"), y_);
+    form->addRow(QStringLiteral("X（变换前坐标）"), x_); form->addRow(QStringLiteral("Y（变换前，较小值）"), y_);
     form->addRow(QStringLiteral("宽度"), width_); form->addRow(QStringLiteral("高度"), height_);
     auto* buttons = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel, this);
     buttons->button(QDialogButtonBox::Ok)->setText(QStringLiteral("确定"));

@@ -77,8 +77,10 @@ OperationResult QcadBlockActions::editSelectedText()
     if (!result.ok()) return result;
     TextPropertiesDialog dialog(properties, &dialogParent_);
     if (dialog.exec() != QDialog::Accepted) return cancelled();
+    view_.beginEdit();
     result = service.apply(*text, dialog.properties());
     if (result.ok()) { view_.setModified(true); view_.update(); }
+    view_.endEdit();
     return result;
 }
 OperationResult QcadBlockActions::beginInsertBlock()
@@ -112,8 +114,9 @@ OperationResult QcadBlockActions::editSelectedBlockTransform()
     if (!block) return {ErrorCode::InvalidInput, QStringLiteral("所选对象不是块实例。")};
     double angle = block->instance.rotationDegrees, factor = block->instance.scale;
     if (!editTransform(dialogParent_, angle, factor)) return cancelled();
+    view_.beginEdit();
     block->instance.rotationDegrees = angle; block->instance.scale = factor;
-    view_.setModified(true); view_.update(); return {};
+    view_.setModified(true); view_.update(); view_.endEdit(); return {};
 }
 void QcadBlockActions::updateTitle()
 {
@@ -122,7 +125,7 @@ void QcadBlockActions::updateTitle()
 OperationResult QcadBlockActions::saveTo(const QString& path)
 {
     auto result = DocumentStorage().save(path, view_, library_);
-    if (result.ok()) { filePath_ = path; updateTitle(); view_.setModified(false); Prompt(QStringLiteral("文档已保存。")); }
+    if (result.ok()) { filePath_ = path; updateTitle(); view_.setModified(false);if(documentSaved) documentSaved();Prompt(QStringLiteral("文档已保存。")); }
     return result;
 }
 OperationResult QcadBlockActions::save()
@@ -150,8 +153,12 @@ OperationResult QcadBlockActions::open()
     if (!confirmDiscard()) return cancelled();
     const auto path = QFileDialog::getOpenFileName(&dialogParent_, QStringLiteral("打开 QCAD 块文档"), {}, QStringLiteral("QCAD 块文档 (*.qbl)"));
     if (path.isEmpty()) return cancelled();
+    return openFrom(path);
+}
+OperationResult QcadBlockActions::openFrom(const QString& path)
+{
     auto result = DocumentStorage().load(path, view_, library_);
-    if (result.ok()) { filePath_ = path; updateTitle(); Prompt(QStringLiteral("文档已打开，可继续插入已有块。")); }
+    if (result.ok()) { filePath_ = path; updateTitle();if(documentReset) documentReset(); Prompt(QStringLiteral("文档已打开，可继续插入已有块。")); }
     return result;
 }
 OperationResult QcadBlockActions::newDocument()
@@ -159,6 +166,7 @@ OperationResult QcadBlockActions::newDocument()
     if (!confirmDiscard()) return cancelled();
     view_.replaceEntities({}); library_.definitions.clear(); filePath_.clear();
     updateTitle(); view_.setModified(false);
+    if(documentReset) documentReset();
     return {};
 }
 }

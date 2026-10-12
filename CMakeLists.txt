@@ -19,6 +19,7 @@ add_library(qcad_more_core STATIC
     src/storage/DocumentStorage.cpp src/storage/EntityCodec.cpp
     src/integration/QcadBlockActions.cpp src/integration/DrawEntityCommand.cpp
     src/integration/PointCommand.cpp
+    src/editing/DocumentHistory.cpp src/editing/EditingActions.cpp
 )
 target_include_directories(qcad_more_core PUBLIC src src/qcad)
 target_compile_definitions(qcad_more_core PUBLIC QT_PAINTER NOMINMAX)
@@ -45,11 +46,23 @@ if(BUILD_TESTING)
     endif()
     add_test(NAME block_workflow COMMAND block_workflow_tests -o test-results.txt,txt)
     set_tests_properties(block_workflow PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
+    add_executable(editor_workflow_tests tests/editor_workflow_tests.cpp src/qcad/resources.qrc)
+    target_link_libraries(editor_workflow_tests PRIVATE qcad_more_core Qt5::Test)
+    target_compile_definitions(editor_workflow_tests PRIVATE QCAD_MORE_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}")
+    if(MSVC)
+        target_compile_options(editor_workflow_tests PRIVATE /utf-8)
+    endif()
+    file(MAKE_DIRECTORY "${CMAKE_BINARY_DIR}/editor-offscreen")
+    add_test(NAME editor_workflow COMMAND editor_workflow_tests -o test-results-editor.txt,txt)
+    set_tests_properties(editor_workflow PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen" WORKING_DIRECTORY "${CMAKE_BINARY_DIR}/editor-offscreen")
     if(WIN32)
         file(MAKE_DIRECTORY "${CMAKE_BINARY_DIR}/native-tests")
         add_test(NAME block_workflow_windows COMMAND block_workflow_tests -o test-results-windows.txt,txt)
         set_tests_properties(block_workflow_windows PROPERTIES
             ENVIRONMENT "QT_QPA_PLATFORM=windows"
             WORKING_DIRECTORY "${CMAKE_BINARY_DIR}/native-tests")
+        file(MAKE_DIRECTORY "${CMAKE_BINARY_DIR}/editor-windows")
+        add_test(NAME editor_workflow_windows COMMAND editor_workflow_tests -o test-results-editor-windows.txt,txt)
+        set_tests_properties(editor_workflow_windows PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=windows" WORKING_DIRECTORY "${CMAKE_BINARY_DIR}/editor-windows")
     endif()
 endif()

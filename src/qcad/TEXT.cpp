@@ -122,7 +122,7 @@ void MText::SetTextColor(QColor color)
 void MText::Draw(QCADView* pView, int drawMode)
 {
     QPainter painter(pView);
-    painter.setWorldTransform(pView->drawingTransform);
+    painter.setWorldTransform(pView->screenTransform(GetTransform()));
     const QRect rect = QRect(pView->WorldtoScreen(m_LeftTop), pView->WorldtoScreen(m_RightBottom)).normalized();
     QFont displayFont = m_Font;
     if (displayFont.pointSizeF() > 0) displayFont.setPointSizeF(displayFont.pointSizeF()*pView->GetScale());

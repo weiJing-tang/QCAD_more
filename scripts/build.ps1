@@ -28,6 +28,8 @@ if ($Check) {
         if ($LASTEXITCODE -ne 0) {
             Get-Content -LiteralPath "$buildRoot/test-results.txt" -ErrorAction SilentlyContinue
             Get-Content -LiteralPath "$buildRoot/native-tests/test-results-windows.txt" -ErrorAction SilentlyContinue
+            Get-Content -LiteralPath "$buildRoot/editor-offscreen/test-results-editor.txt" -ErrorAction SilentlyContinue
+            Get-Content -LiteralPath "$buildRoot/editor-windows/test-results-editor-windows.txt" -ErrorAction SilentlyContinue
             throw 'Workflow verification failed.'
         }
     } finally { $env:PATH = $savedPath; $env:QT_QPA_PLATFORM_PLUGIN_PATH = $savedPlugins }

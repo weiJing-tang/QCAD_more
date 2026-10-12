@@ -14,6 +14,7 @@
 | text | TextPropertyService、TextPropertiesDialog | 完整读取/编辑文字、字体、颜色和文本框 |
 | storage | EntityCodec、DocumentStorage | 图元载荷、版本化文件、原子保存、完整校验后加载 |
 | integration | QcadBlockActions、PointCommand、DrawEntityCommand | 菜单、对话框、基点选择、连续插入、绘图预览与取消 |
+| editing | DocumentHistory、EditingActions | 文档撤销事务、剪贴板、排列、组合拆分、仿射变换和样式 |
 
 ## 数据与所有权
 
@@ -36,16 +37,25 @@ QcadBlockActions 的 defineBlock/beginInsertBlock 返回成功表示交互已启
 
 首次插入后命令保留，可连续提交。Esc/右键结束；切换工具也清除预览。定义成功后通过事件队列切回选择命令，避免在正在执行的命令回调中销毁自身。
 
-选择状态下，左键命中最上层块且未按 Shift 时进入拖动候选，按住选中块可移动整个选择集。超过 QApplication::startDragDistance 后，将选择集深复制为一个临时预览组合，隐藏原件的绘制，但不改写原图元数据。世界位移为 `ScreentoWorld(current) - ScreentoWorld(press)`；预览跟随位移更新。松开时对原选择集调用 Move(origin, delta)，标记修改并释放预览；取消只释放预览与恢复光标，原文档数据及修改状态不变。空白/普通图元起手和 Shift 继续使用原框选/点选流程。
+选择状态下，左键命中图元或已选图元内部且未按 Shift 时进入拖动候选，可带动整个选择集。超过 QApplication::startDragDistance 后深复制为临时预览，隐藏原件绘制但不改写数据。世界位移为 `ScreentoWorld(current) - ScreentoWorld(press)`，松开时调用 TranslateWorld(delta)，作为一次撤销事务提交。取消只释放预览并恢复光标。空白与 Shift 仍用于框选/追加。
 
-## qbl 文件格式 v2（兼容读取 v1）
+滚轮以当前鼠标世界点为锚：先记录 anchor，再将比例乘以 `1.15^(angleDelta/120)` 并限制到 0.01–100；重新计算浮点原点，使 anchor 仍映射到同一屏幕位置。触控板可使用 pixelDelta。中键拖动仅平移视图原点，比例输入与实际比例同步。视图变动不修改文档、不进入 Undo。
+
+MEntity 的 m_transform 保留旋转、等比缩放和翻转。WorldBox 在原 GetBox 后映射变换；HitTest 将点逆变换并换算拾取半径。绘制通过 QCADView::screenTransform 共轭至屏幕空间，组合父块变换。TranslateWorld 在单位变换时沿用旧 Move，否则将世界平移附加到矩阵；避免旋转图形沿错误方向移动。所有基元类型保持不变。
+
+DocumentHistory 在事务外层捕获 before/after（实体快照、块库、选择），不同才压入 QUndoStack；首次 redo 不重复执行已提交操作。Undo/Redo 全部解码后替换场景与块库，并恢复选择；dirty 以 stack 的 clean 保存位置为准。上限 100 次编辑，打开/新建清空历史。嵌套 begin/end 将批量操作合为一次记录。
+
+剪贴板为有标识的 Qt MIME 图元数据，包含所需块库与快照。粘贴先解码、复制并重新生成实例 UUID，再合并定义与命名冲突，平移后一次性提交。组合用已有块定义/实例机制替换选择集；拆组将父变换附加到各子图元变换后拆出一层。对齐和分布按 WorldBox 计算世界平移，图层操作保留选择对象内部相对次序。
+
+## qbl 文件格式 v3（兼容读取 v1/v2）
 
 使用 QDataStream，固定流版本为 Qt_5_12，默认大端序。没有裸写实体内存或指针。
 
-1. 文件头：quint32 magic `0x51424c4b`（QBLK）、quint32 格式版本 `2`。
+1. 文件头：quint32 magic `0x51424c4b`（QBLK）、quint32 格式版本 `3`。
 2. 块库：quint32 定义数；每个定义为 QUuid、QString 名称、QPointF 原基点、quint32 子图元数；每个子图元是 qint32 类型和 QByteArray 载荷。
 3. 场景：quint32 实体数；每个实体先写 qint32 类型，再写 QByteArray 载荷。块载荷为画笔/画刷、实例 UUID、定义 UUID、位置、角度、等比缩放、子图元数量及递归快照。子块作为自包含快照，无循环定义引用。v1 分支继续读取实例 UUID、定义 UUID、位置，并按定义重建。
 4. 普通实体载荷先保存 QPen/QBrush，再由相应图元 Serialize 保存几何数据；Text 额外包含 QString 内容、QFont、QColor，保持复制/重开后的完整属性。
+5. v3 图元载荷增加 QEN3 标识：标识 + 原 Serialize 内容 + QTransform。递归子块同样使用新载荷；旧载荷没有标识，解码时保持单位变换，因此真实 v1/v2 数据仍可读。Undo 历史、剪贴板和视图状态不写入文件。
 
 支持直线、矩形、圆、圆弧、椭圆、多边形、Text 和嵌套块。递归编解码限制 32 层，单文件 128 MiB、各级记录数 100000；这是加载保护，不是性能承诺。块实例保存完整快照，以保留单实例文字修改。
 
@@ -63,8 +73,8 @@ QcadBlockActions 的 defineBlock/beginInsertBlock 返回成功表示交互已启
 
 ## 验证和后续边界
 
-tests/block_workflow_tests.cpp 同时在 offscreen 和 Windows 原生 QPA 运行，分别输出日志和截图。验证完整图元数据往返、失败时状态保护、缩放/Shift 选择、编辑取消、嵌套实例的旋转缩放/文字编辑及 v1 兼容读取。
+block_workflow_tests 与 editor_workflow_tests 都在 offscreen 和 Windows 原生 QPA 运行。原套件验证块/Text/失败保护；新增套件验证滚轮与平移、七类普通图元拖动/Undo、剪贴板/微移、六种对齐和等距分布、仿射变换/组合拆分/保存、绘图/定义/插入/Text 的 Undo、图层样式、全部绘图工具取消，以及真实 v1 示例与旧格式 v2 数据。保存与打开使用菜单共用的带路径入口进行测试，文件选择弹窗由 Qt 提供。
 
 块变换为 T(position)·R(angle)·S(scale)·T(-position)，子图元仍保留变换前坐标。绘制时将世界变换共轭到屏幕坐标，并与父块绘制变换组合；全部图元使用同一个绘制变换，因此矩形、椭圆和文字的方向均保持正确。GetBox 逐层变换轴对齐包围盒。移动同时平移子图元和变换基点。
 
-Text 属性入口可递归列出选中块的内部文字，通过路径选择子图元，只修改当前实例快照。块定义不会同步改变。不支持非等比缩放、镜像、DXF/DWG 或原课程 .cad；编辑块定义本身需重新定义新名称。
+Text 属性入口可递归列出选中块的内部文字，通过路径选择子图元，只修改当前实例快照。块定义不会同步改变。支持水平/垂直翻转，暂不支持非等比缩放、八点尺寸手柄、DXF/DWG 或原课程 .cad；编辑块定义本身需重新定义新名称。

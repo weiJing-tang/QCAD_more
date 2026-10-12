@@ -19,7 +19,7 @@ OperationResult makeBlockEntity(const BlockDefinition& definition, const BlockIn
         std::unique_ptr<MEntity> entity;
         auto result = decodeEntity(snapshot, entity);
         if (!result.ok()) return result;
-        entity->Move(QPointF(), instance.position);
+        entity->TranslateWorld(instance.position);
         block->children.push_back(std::move(entity));
     }
     output = std::move(block);
@@ -29,6 +29,8 @@ MEntity* BlockEntity::Copy()
 {
     auto copy = std::make_unique<BlockEntity>();
     copy->instance = instance;
+    copy->SetTransform(GetTransform());
+    auto pen = GetPen(); auto brush = GetBrush(); copy->SetAttrib(&pen, &brush);
     copy->instance.instanceId = QUuid::createUuid();
     for (const auto& child : children) copy->children.emplace_back(child->Copy());
     return copy.release();
@@ -36,10 +38,7 @@ MEntity* BlockEntity::Copy()
 void BlockEntity::Draw(QCADView* view, int mode)
 {
     const auto previous = view->drawingTransform;
-    const auto origin = view->WorldtoScreen(QPointF());
-    QTransform worldToScreen(view->GetScale(), 0, 0, -view->GetScale(), origin.x(), origin.y());
-    // Conjugate the world transform into screen space; retain any parent block transform.
-    view->drawingTransform = worldToScreen.inverted() * worldTransform() * worldToScreen * previous;
+    view->drawingTransform = view->screenTransform(worldTransform() * GetTransform());
     for (const auto& child : children) child->Draw(view, mode);
     view->drawingTransform = previous;
 }
@@ -51,10 +50,10 @@ bool BlockEntity::Pick(const QPointF& point, double radius)
 void BlockEntity::GetBox(QRectF& box)
 {
     if (children.empty()) { box = {}; return; }
-    children.front()->GetBox(box);
+    children.front()->WorldBox(box);
     box = box.normalized();
     for (size_t i = 1; i < children.size(); ++i) {
-        QRectF next; children[i]->GetBox(next); next = next.normalized();
+        QRectF next; children[i]->WorldBox(next); next = next.normalized();
         box = QRectF(QPointF(qMin(box.left(), next.left()), qMin(box.top(), next.top())),
                      QPointF(qMax(box.right(), next.right()), qMax(box.bottom(), next.bottom())));
     }
@@ -62,7 +61,7 @@ void BlockEntity::GetBox(QRectF& box)
 }
 void BlockEntity::Move(const QPointF& from, const QPointF& to, bool temporary)
 {
-    for (const auto& child : children) child->Move(from, to, temporary);
+    for (const auto& child : children) child->TranslateWorld(to - from);
     instance.position += to - from;
 }
 QTransform BlockEntity::worldTransform() const

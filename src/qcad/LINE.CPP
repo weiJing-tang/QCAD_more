@@ -81,7 +81,7 @@ void MLine::Draw(QCADView * pView, int drawMode /* = dmNormal */)
 	pt_end = pView->WorldtoScreen(m_end) ;
 
 	QPainter pDC(pView);
-    pDC.setWorldTransform(pView->drawingTransform);
+    pDC.setWorldTransform(pView->screenTransform(GetTransform()));
 	//int		n = GetROP2(pDC->GetSafeHdc()); // 得到原来的绘图模式
 	//::SetDrawEnvir(pDC, drawMode);
 

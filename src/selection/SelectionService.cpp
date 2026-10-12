@@ -18,7 +18,7 @@ OperationResult SelectionService::selectInRectangle(QCADView& view, const QRectF
     if (mode == SelectionMode::Replace) view.ClearSelections();
     for (auto* entity : view.GetEntityList()) {
         QRectF box;
-        entity->GetBox(box);
+        entity->WorldBox(box);
         box = box.normalized();
         // Point containment also handles zero-height horizontal/vertical lines.
         if (rect.contains(box.topLeft()) && rect.contains(box.bottomRight()))

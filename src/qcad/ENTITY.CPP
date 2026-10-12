@@ -201,6 +201,7 @@ MEntity::MEntity(const MEntity& entity)
 	next = nullptr;
     m_brush = entity.m_brush;
     m_pen = entity.m_pen;
+    m_transform = entity.m_transform;
 	m_nOperationNum = 0;
 	m_type = entity.m_type;
 }
@@ -225,6 +226,7 @@ MEntity MEntity::operator = (const MEntity& entity)
 	next = nullptr;
     m_brush = entity.m_brush;
     m_pen = entity.m_pen;
+    m_transform = entity.m_transform;
 	m_type = entity.m_type;
 	return *this;
 }

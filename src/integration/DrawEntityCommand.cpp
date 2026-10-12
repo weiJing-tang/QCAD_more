@@ -76,8 +76,10 @@ int MoveSelectionCommand::OnLButtonDown(QMouseEvent* event)
     if (m_pDC->GetSelectedEntityList().isEmpty()) { Prompt(QStringLiteral("请先选择要移动的图形。")); return 0; }
     if (m_nStep == 0) { start_ = position; m_nStep = 1; Prompt(QStringLiteral("请选择移动目标点。")); }
     else {
-        for (auto* entity : m_pDC->GetSelectedEntityList()) entity->Move(start_, position);
+        m_pDC->beginEdit();
+        for (auto* entity : m_pDC->GetSelectedEntityList()) entity->TranslateWorld(position-start_);
         m_pDC->setModified(true); m_pDC->update(); Cancel();
+        m_pDC->endEdit();
     }
     return 0;
 }

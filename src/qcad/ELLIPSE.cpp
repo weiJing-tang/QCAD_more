@@ -7,7 +7,7 @@ MEllipse::MEllipse() {
     Init();
 }
 
-MEllipse::MEllipse(const MEllipse& elps) {
+MEllipse::MEllipse(const MEllipse& elps) : MEntity(elps) {
     Init();
     m_LeftTop = elps.m_LeftTop;
     m_RightBottom = elps.m_RightBottom;
@@ -67,7 +67,7 @@ QPointF MEllipse::GetRBPos() {
 void MEllipse::Draw(QCADView* pView, int drawMode)
 {
     QPainter pDC(pView);
-    pDC.setWorldTransform(pView->drawingTransform);
+    pDC.setWorldTransform(pView->screenTransform(GetTransform()));
     //if (drawMode == dmInvalid) return;
 
     if (drawMode == dmSelect)
@@ -87,7 +87,7 @@ void MEllipse::Draw(QCADView* pView, int drawMode)
     // 创建椭圆的矩形边界并绘制椭圆
     QPoint lt = pView->WorldtoScreen(m_LeftTop);
     QPoint rb = pView->WorldtoScreen(m_RightBottom);
-    QRectF ellipseRect(lt, rb);
+    QRectF ellipseRect=QRectF(lt, rb).normalized();
     pDC.drawEllipse(ellipseRect);
 
     //QPen penToUse;

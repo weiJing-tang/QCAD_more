@@ -8,7 +8,7 @@ CArc::CArc()
 }
 
 // 复制构造函数，复制另一个弧对象的属性
-CArc::CArc(const CArc& arc)
+CArc::CArc(const CArc& arc) : MEntity(arc)
 {
     Init();
     m_center = arc.m_center;
@@ -107,7 +107,7 @@ void CArc::SetEndPos(QPointF& pt)
 void CArc::Draw(QCADView* pView, int drawMode)
 {
     QPainter pDC(pView);
-    pDC.setWorldTransform(pView->drawingTransform);
+    pDC.setWorldTransform(pView->screenTransform(GetTransform()));
 
     // 计算弧的半径
     qreal radius = sqrt(pow(m_center.x() - m_begin.x(), 2) + pow(m_center.y() - m_begin.y(), 2));

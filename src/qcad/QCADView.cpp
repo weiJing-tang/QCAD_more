@@ -3,6 +3,7 @@
 #include <QKeyEvent>
 #include <QPaintEvent>
 #include <QMouseEvent>
+#include <QWheelEvent>
 #include <algorithm>
 #include "QCADView.h"
 #include "ENTITY.H"
@@ -118,6 +119,11 @@ void QCADView::resizeEvent(QResizeEvent* event)
 
 void QCADView::mousePressEvent(QMouseEvent* mouseEvent)
 {
+    if (mouseEvent->button() == Qt::MiddleButton) {
+        if (m_pCmd && m_pCmd->GetType() == ctSelect) m_pCmd->Cancel();
+        panning_ = true; panOrigin_ = mouseEvent->pos(); panCursor_ = cursor();
+        setCursor(Qt::ClosedHandCursor); mouseEvent->accept(); return;
+    }
 	if (mouseEvent->button() == Qt::LeftButton && m_pCmd)
 	{
 		m_pCmd->OnLButtonDown(mouseEvent);
@@ -130,6 +136,10 @@ void QCADView::mousePressEvent(QMouseEvent* mouseEvent)
 
 void QCADView::mouseMoveEvent(QMouseEvent* mouseEvent)
 {
+    if (panning_) {
+        const QPoint delta = mouseEvent->pos() - panOrigin_;
+        MoveOrg(delta.x(), delta.y()); panOrigin_ = mouseEvent->pos(); update(); return;
+    }
 	if (m_pCmd)
 	{
 		m_pCmd->OnMouseMove(mouseEvent);
@@ -157,6 +167,10 @@ void QCADView::mouseMoveEvent(QMouseEvent* mouseEvent)
 
 void QCADView::mouseReleaseEvent(QMouseEvent* mouseEvent)
 {
+    if (mouseEvent->button() == Qt::MiddleButton && panning_) {
+        const QPoint delta = mouseEvent->pos() - panOrigin_;
+        MoveOrg(delta.x(), delta.y()); panning_ = false; setCursor(panCursor_); update(); return;
+    }
     if (m_pCmd && mouseEvent->button() == Qt::LeftButton) m_pCmd->OnLButtonUp(mouseEvent);
 }
 
@@ -172,7 +186,7 @@ void QCADView::mouseDoubleClickEvent(QMouseEvent* mouseEvent)
 	if (selecting) {
         for (auto it = m_EntityList.crbegin(); it != m_EntityList.crend(); ++it) {
             MEntity* entity = *it;
-            if (entity->GetType() == etText && entity->Pick(worldPoint, 5.0 / GetScale())) {
+            if (entity->GetType() == etText && entity->HitTest(worldPoint, 5.0 / GetScale())) {
                 ClearSelections();
                 AddSelection(entity);
                 update();
@@ -192,13 +206,15 @@ void QCADView::mouseDoubleClickEvent(QMouseEvent* mouseEvent)
 
 void QCADView::addEntity(MEntity* pEnt)
 {
-    if (pEnt) { m_EntityList.push_back(pEnt); setModified(true); update(); }
+    if (pEnt) { beginEdit(); m_EntityList.push_back(pEnt); setModified(true); update(); endEdit(); }
 }
 
 void QCADView::removeEntity(MEntity* pEnt)
 {
+    beginEdit();
     m_SelectEntityList.removeAll(pEnt);
     if (m_EntityList.removeOne(pEnt)) { setModified(true); update(); }
+    endEdit();
 }
 
 void QCADView::removeLastEntity()
@@ -264,14 +280,13 @@ void QCADView::drawText()
 void QCADView::setScale(double scale)
 {
     if (std::isfinite(scale)) m_scale = qBound(0.01, scale, 100.0);
+    if (zoomChanged) zoomChanged(m_scale);
 }
 
 //窗口功能
 void QCADView::Scale(double scale)
 {
-	qreal scale_new = m_scale * scale;
-	setScale(scale_new);
-	update();
+    zoomAt(QPointF(width()/2.0,height()/2.0), scale);
 }
 
 void QCADView::zoomRect(QRectF rect)
@@ -287,13 +302,32 @@ void QCADView::zoomRect(QRectF rect)
 //center是屏幕坐标系
 void QCADView::ScaleCenter(double scale, QPoint center)
 {
-	int X_Cen = this->width() / 2;
-	int Y_cen = this->height() / 2;
-
-	m_Xorg -= center.x() - X_Cen;
-	m_Yorg -= center.y() - Y_cen;
-	m_scale *= scale;
-	update();
+    zoomAt(center,scale);
+}
+void QCADView::zoomAt(QPointF screenPoint, double factor)
+{
+    if (!std::isfinite(factor) || factor <= 0) return;
+    const auto anchor = ScreentoWorld(screenPoint);
+    setScale(m_scale * factor);
+    m_Xorg = screenPoint.x() - anchor.x()*m_scale;
+    m_Yorg = screenPoint.y() + anchor.y()*m_scale;
+    update();
+}
+void QCADView::wheelEvent(QWheelEvent* event)
+{
+    if (m_pCmd && m_pCmd->GetType() == ctSelect) m_pCmd->Cancel();
+    const double steps = event->angleDelta().y() ? event->angleDelta().y()/120.0 : event->pixelDelta().y()/40.0;
+#if QT_VERSION >= QT_VERSION_CHECK(5,14,0)
+    zoomAt(event->position(), std::pow(1.15,steps));
+#else
+    zoomAt(event->posF(), std::pow(1.15,steps));
+#endif
+    event->accept();
+}
+QTransform QCADView::screenTransform(const QTransform& world) const
+{
+    QTransform viewport(m_scale,0,0,-m_scale,m_Xorg,m_Yorg);
+    return viewport.inverted() * world * viewport * drawingTransform;
 }
 
 void QCADView::MoveOrg(int delX, int delY)
@@ -364,6 +398,7 @@ void QCADView::zoomWindow()
 
 void QCADView::setCommand(MCommand* command)
 {
+    if (panning_) { panning_=false; setCursor(panCursor_); }
     if (m_pCmd) m_pCmd->Cancel();
     delete m_pCmd;
     m_pCmd = command;
@@ -392,8 +427,22 @@ void QCADView::setModified(bool modified)
     modified_ = modified;
     if (modifiedChanged) modifiedChanged(modified);
 }
+void QCADView::reorderEntities(QList<MEntity*> entities)
+{
+    if (entities.size()!=m_EntityList.size()) return;
+    beginEdit(); m_EntityList=std::move(entities); setModified(true); update(); endEdit();
+}
 void QCADView::keyPressEvent(QKeyEvent* event)
 {
     if (event->key() == Qt::Key_Escape) { selectEntity(); return; }
+    if (nudgeRequested && !(event->modifiers() & (Qt::ControlModifier | Qt::AltModifier))) {
+        const double distance=event->modifiers().testFlag(Qt::ShiftModifier)?10:1;
+        QPointF delta;
+        if (event->key()==Qt::Key_Left) delta={-distance,0};
+        else if(event->key()==Qt::Key_Right) delta={distance,0};
+        else if(event->key()==Qt::Key_Up) delta={0,distance};
+        else if(event->key()==Qt::Key_Down) delta={0,-distance};
+        if(!delta.isNull()) { nudgeRequested(delta); event->accept(); return; }
+    }
     QWidget::keyPressEvent(event);
 }

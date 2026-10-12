@@ -2,6 +2,7 @@
 #include <QWidget>
 #include <QList>
 #include <QTransform>
+#include <QCursor>
 #include <memory>
 #include <functional>
 
@@ -19,13 +20,18 @@ private:
     std::unique_ptr<MEntity> preview_;
     QList<MEntity*> previewHiddenEntities_;
     bool modified_ = false;
+    bool panning_ = false;
+    QPoint panOrigin_;
+    QCursor panCursor_;
 
 public:
     QTransform drawingTransform;
+    QTransform screenTransform(const QTransform& world) const;
     QCADView();
     ~QCADView();
 
 protected:
+    void wheelEvent(QWheelEvent* event) override;
     void keyPressEvent(QKeyEvent* event) override;
     void paintEvent(QPaintEvent* event);
     void resizeEvent(QResizeEvent* event);
@@ -42,6 +48,12 @@ public:
     void setModified(bool modified);
     bool isModified() const { return modified_; }
     std::function<void(bool)> modifiedChanged;
+    std::function<void()> editStarted, editFinished;
+    std::function<void(QPointF)> nudgeRequested;
+    std::function<void(double)> zoomChanged;
+    void beginEdit() { if (editStarted) editStarted(); }
+    void endEdit() { if (editFinished) editFinished(); }
+    void reorderEntities(QList<MEntity*> entities);
     void addEntity(MEntity* pEnt);
     void removeEntity(MEntity* pEnt);
     void selectEntity();
@@ -65,8 +77,8 @@ private:
 
     //窗口
     double m_scale; //世界坐标 / 屏幕坐标
-    int m_Xorg;     //世界坐标系 原点在屏幕坐标中的位置
-    int m_Yorg;
+    double m_Xorg;
+    double m_Yorg;
 
 public:
     void setLineColor(QColor color) { m_lineColor = color; }
@@ -97,6 +109,7 @@ public:
     void MoveOrg(int delX, int delY);
     void setOrg(QPoint cps);
     double GetScale();
+    void zoomAt(QPointF screenPoint, double factor);
     QPoint WorldtoScreen(QPointF pos);
     QPointF ScreentoWorld(QPoint pos);
     QPointF ScreentoWorld(QPointF pos);

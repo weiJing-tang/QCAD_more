@@ -78,7 +78,7 @@ QPointF MRectangle::GetRightBottomPos()
 void MRectangle::Draw(QCADView* pView, int drawMode)
 {
 	QPainter pDC(pView);
-    pDC.setWorldTransform(pView->drawingTransform);
+    pDC.setWorldTransform(pView->screenTransform(GetTransform()));
 	if (drawMode == dmSelect)
 	{
 		QPen pen(Qt::DashLine);
@@ -96,7 +96,7 @@ void MRectangle::Draw(QCADView* pView, int drawMode)
 	pt_begin = pView->WorldtoScreen(m_LeftTop);
 	pt_end = pView->WorldtoScreen(m_RightBottom);
 
-	pDC.drawRect(QRect(pt_begin, pt_end));
+	pDC.drawRect(QRect(pt_begin, pt_end).normalized());
 }
 
 bool MRectangle::Pick(const QPointF& pos, const double pick_radius)

@@ -27,7 +27,7 @@ OperationResult BlockDefinitionService::defineBlock(const QList<MEntity*>& selec
         std::unique_ptr<MEntity> copy;
         result = decodeEntity(snapshot, copy);
         if (!result.ok()) return result;
-        copy->Move(request.basePoint, QPointF());
+        copy->TranslateWorld(-request.basePoint);
         result = encodeEntity(*copy, snapshot);
         if (!result.ok()) return result;
         definition.entities.push_back(std::move(snapshot));

@@ -1,0 +1,28 @@
+********* Start testing of EditorWorkflowTests *********
+Config: Using QtTest library 5.15.2, Qt 5.15.2 (x86_64-little_endian-llp64 shared (dynamic) release build; by MSVC 2019), windows 10
+PASS   : EditorWorkflowTests::initTestCase()
+PASS   : EditorWorkflowTests::wheelZoomAndPan()
+PASS   : EditorWorkflowTests::ordinaryDrag(2)
+PASS   : EditorWorkflowTests::ordinaryDrag(3)
+PASS   : EditorWorkflowTests::ordinaryDrag(4)
+PASS   : EditorWorkflowTests::ordinaryDrag(5)
+PASS   : EditorWorkflowTests::ordinaryDrag(7)
+PASS   : EditorWorkflowTests::ordinaryDrag(9)
+PASS   : EditorWorkflowTests::ordinaryDrag(8)
+PASS   : EditorWorkflowTests::clipboardAndShortcuts()
+PASS   : EditorWorkflowTests::alignAndDistribute(alignLeftAction)
+PASS   : EditorWorkflowTests::alignAndDistribute(alignHCenterAction)
+PASS   : EditorWorkflowTests::alignAndDistribute(alignRightAction)
+PASS   : EditorWorkflowTests::alignAndDistribute(alignTopAction)
+PASS   : EditorWorkflowTests::alignAndDistribute(alignVCenterAction)
+PASS   : EditorWorkflowTests::alignAndDistribute(alignBottomAction)
+PASS   : EditorWorkflowTests::alignAndDistribute(distributeHorizontalAction)
+PASS   : EditorWorkflowTests::alignAndDistribute(distributeVerticalAction)
+PASS   : EditorWorkflowTests::transformGroupAndPersistence()
+PASS   : EditorWorkflowTests::undoDrawingBlocksTextAndFiles()
+PASS   : EditorWorkflowTests::orderingAndStyle()
+PASS   : EditorWorkflowTests::drawingToolsAndCancellation()
+PASS   : EditorWorkflowTests::legacyDocuments()
+PASS   : EditorWorkflowTests::cleanupTestCase()
+Totals: 24 passed, 0 failed, 0 skipped, 0 blacklisted, 3397ms
+********* Finished testing of EditorWorkflowTests *********

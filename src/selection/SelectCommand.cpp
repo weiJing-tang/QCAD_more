@@ -14,8 +14,10 @@ int SelectCommand::OnLButtonDown(QMouseEvent* event)
     if (!append_) {
         const auto entities = m_pDC->GetEntityList();
         for (auto it = entities.crbegin(); it != entities.crend(); ++it) {
-            if (!(*it)->Pick(dragOrigin_, 5.0 / m_pDC->GetScale())) continue;
-            if ((*it)->GetType() == etBlock) {
+            QRectF box; (*it)->WorldBox(box);
+            const bool selectedInterior = m_pDC->GetSelectedEntityList().contains(*it) && box.contains(dragOrigin_);
+            if (!selectedInterior && !(*it)->HitTest(dragOrigin_, 5.0 / m_pDC->GetScale())) continue;
+            {
                 if (!m_pDC->GetSelectedEntityList().contains(*it)) {
                     m_pDC->ClearSelections(); m_pDC->AddSelection(*it);
                 }
@@ -53,7 +55,7 @@ int SelectCommand::OnMouseMove(QMouseEvent* event)
             auto* preview = static_cast<BlockEntity*>(dragPreview_);
             preview->Move(preview->instance.position, delta);
             m_pDC->update();
-            Prompt(QStringLiteral("拖动块：松开提交，Esc / 右键取消。"));
+            Prompt(QStringLiteral("拖动图形：松开提交，Esc / 右键取消。"));
             return 0;
         }
         band_->setGeometry(QRect(origin_, event->pos()).normalized());
@@ -68,11 +70,13 @@ int SelectCommand::OnLButtonUp(QMouseEvent* event)
         OnMouseMove(event); // Include the final release position, even without a move event.
         const auto delta = m_pDC->ScreentoWorld(event->pos()) - dragOrigin_;
         if (dragPreview_ && !delta.isNull()) {
-            for (auto* entity : dragTargets_) entity->Move(QPointF(), delta);
+            m_pDC->beginEdit();
+            for (auto* entity : dragTargets_) entity->TranslateWorld(delta);
             m_pDC->setModified(true);
+            m_pDC->endEdit();
         }
         Cancel();
-        Prompt(QStringLiteral("块位置已确定；按住块可再次拖动。"));
+        Prompt(QStringLiteral("位置已确定；按住选中图形可再次拖动。"));
         return 0;
     }
     if ((origin_ - event->pos()).manhattanLength() > 4) {
@@ -84,7 +88,7 @@ int SelectCommand::OnLButtonUp(QMouseEvent* event)
         const auto entities = m_pDC->GetEntityList();
         const auto position = m_pDC->ScreentoWorld(event->pos());
         for (auto it = entities.crbegin(); it != entities.crend(); ++it) {
-            if ((*it)->Pick(position, 5.0/m_pDC->GetScale())) {
+            if ((*it)->HitTest(position, 5.0/m_pDC->GetScale())) {
                 if (append_ && m_pDC->GetSelectedEntityList().contains(*it)) m_pDC->RemoveSelection(*it);
                 else m_pDC->AddSelection(*it);
                 break;

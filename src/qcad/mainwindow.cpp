@@ -81,6 +81,17 @@ MainWindow::MainWindow()
     view->modifiedChanged = [this](bool modified) { setWindowModified(modified); };
     setWindowTitle(QStringLiteral("QCAD - 未命名[*]"));
     blockActions_ = std::make_unique<qcad_more::QcadBlockActions>(*view, blockLibrary_, *this);
+    editing_=std::make_unique<qcad_more::EditingActions>(*view,blockLibrary_,*this);
+    editing_->addMenus();
+    blockActions_->documentSaved=[this]{editing_->history.markSaved();};
+    blockActions_->documentReset=[this]{editing_->history.reset();};
+    newFileAction->setObjectName("newFileAction");openFileAction->setObjectName("openFileAction");
+    saveFileAction->setObjectName("saveFileAction");saveAsFileAction->setObjectName("saveAsFileAction");
+    deleteAction->setObjectName("deleteAction");
+    sceneScaleCombo->setObjectName("viewScaleCombo");
+    sceneScaleCombo->setEditable(true);
+    connect(sceneScaleCombo->lineEdit(),&QLineEdit::editingFinished,this,[this]{sceneScaleChanged(sceneScaleCombo->currentText());});
+    view->zoomChanged=[this](double scale){QSignalBlocker block(sceneScaleCombo);sceneScaleCombo->setCurrentText(QString::number(scale*100,'f',0)+"%");};
     auto* blockMenu = menuBar()->addMenu(QStringLiteral("图形块"));
     addToolBarBreak();
     auto* blockToolbar = addToolBar(QStringLiteral("图形块"));
@@ -105,7 +116,7 @@ MainWindow::MainWindow()
         view->update();
     });
     view->selectEntity();
-    statusBar()->showMessage(QStringLiteral("拖框选择复合图形，Shift 追加；图形块菜单提供定义、插入及 Text 属性。"));
+    statusBar()->showMessage(QStringLiteral("滚轮缩放，中键平移；选中图形可拖动，编辑/排列菜单提供复制、撤销、组合与对齐。"));
 }
 //! [0]
 
@@ -152,7 +163,7 @@ void MainWindow::buttonGroupClicked(int id)
 //! [3]
 void MainWindow::deleteItem()
 {
-    removeEntity();
+    if(editing_) editing_->remove();
 }
 //! [3]
 
@@ -166,36 +177,14 @@ void MainWindow::pointerGroupClicked(int)
 //! [5]
 void MainWindow::bringToFront()
 {
-    //if (scene->selectedItems().isEmpty())
-    //    return;
-
-    //QGraphicsItem *selectedItem = scene->selectedItems().first();
-    //QList<QGraphicsItem *> overlapItems = selectedItem->collidingItems();
-
-    //qreal zValue = 0;
-    //foreach (QGraphicsItem *item, overlapItems) {
-    //    if (item->zValue() >= zValue && item->type() == DiagramItem::Type)
-    //        zValue = item->zValue() + 0.1;
-    //}
-    //selectedItem->setZValue(zValue);
+    if(editing_) editing_->order(true);
 }
 //! [5]
 
 //! [6]
 void MainWindow::sendToBack()
 {
-    //if (scene->selectedItems().isEmpty())
-    //    return;
-
-    //QGraphicsItem *selectedItem = scene->selectedItems().first();
-    //QList<QGraphicsItem *> overlapItems = selectedItem->collidingItems();
-
-    //qreal zValue = 0;
-    //foreach (QGraphicsItem *item, overlapItems) {
-    //    if (item->zValue() <= zValue && item->type() == DiagramItem::Type)
-    //        zValue = item->zValue() - 0.1;
-    //}
-    //selectedItem->setZValue(zValue);
+    if(editing_) editing_->order(false);
 }
 //! [6]
 
@@ -233,7 +222,13 @@ void MainWindow::fontSizeChanged(const QString &)
 //! [11]
 void MainWindow::sceneScaleChanged(const QString &scale)
 {
-    double newScale = scale.left(scale.indexOf(tr("%"))).toDouble() / 100.0;
+    QString input=scale;input.remove('%');bool valid=false;
+    const double newScale=input.trimmed().toDouble(&valid)/100.0;
+    if(valid && newScale>0 && std::isfinite(newScale) && view)
+        view->zoomAt(QPointF(view->width()/2.0,view->height()/2.0),newScale/view->GetScale());
+    else if(view && sceneScaleCombo) {
+        QSignalBlocker block(sceneScaleCombo);sceneScaleCombo->setCurrentText(QString::number(view->GetScale()*100,'f',0)+"%");
+    }
     //QMatrix oldMatrix = view->matrix();
     //view->resetMatrix();
     //view->translate(oldMatrix.dx(), oldMatrix.dy());
@@ -280,6 +275,7 @@ void MainWindow::textButtonTriggered()
 #ifdef QT_PAINTER
     //QCAD-QPainter版本
     view->setTextColor(qvariant_cast<QColor>(textAction->data()));
+    if(editing_) {auto color=view->textColor();editing_->style(nullptr,nullptr,nullptr,&color);}
 #else
     scene->setTextColor(qvariant_cast<QColor>(textAction->data()));
 #endif // QT_PAINTER
@@ -292,6 +288,7 @@ void MainWindow::fillButtonTriggered()
 #ifdef QT_PAINTER
     //QCAD-QPainter版本
     view->setBrushColor(qvariant_cast<QColor>(fillAction->data()));
+    if(editing_) {QBrush brush(view->brushColor());editing_->style(nullptr,&brush);}
 #else
     scene->setItemColor(qvariant_cast<QColor>(fillAction->data()));
 #endif // QT_PAINTER
@@ -304,6 +301,7 @@ void MainWindow::lineButtonTriggered()
 #ifdef QT_PAINTER
     //QCAD-QPainter版本
     view->setLineColor(qvariant_cast<QColor>(lineAction->data()));
+    if(editing_) {QPen pen(view->lineColor());pen.setWidthF(view->penWidth());pen.setStyle(view->penStyle());editing_->style(&pen,nullptr);}
 #else
     scene->setLineColor(qvariant_cast<QColor>(lineAction->data()));
 #endif // QT_PAINTER
@@ -328,6 +326,7 @@ void MainWindow::lineTypeChanged(QString sType)
 #ifdef QT_PAINTER
     //QCAD-QPainter版本
     view->setPenStyle(pStyle);
+    if(editing_) {QPen pen(view->lineColor());pen.setWidthF(view->penWidth());pen.setStyle(pStyle);editing_->style(&pen,nullptr);}
 #else
     scene->setPenStyle(pStyle);
 #endif // QT_PAINTER
@@ -356,6 +355,7 @@ void MainWindow::lineWidChanged(QString sWid)
 #ifdef QT_PAINTER
     //QCAD-QPainter版本
     view->setPenWidth(pWid);
+    if(editing_) {QPen pen(view->lineColor());pen.setWidthF(pWid);pen.setStyle(view->penStyle());editing_->style(&pen,nullptr);}
 #else
     scene->setPenWidth(pWid);
 #endif // QT_PAINTER
@@ -373,6 +373,7 @@ void MainWindow::handleFontChange()
 #ifdef QT_PAINTER
     //QCAD-QPainter版本
     view->setFont(font);
+    if(editing_) editing_->style(nullptr,nullptr,&font);
 #else
     scene->setFont(font);
 #endif // QT_PAINTER
@@ -974,9 +975,9 @@ void MainWindow::zoomAll()
 {
     const auto entities = view->GetEntityList();
     if (entities.isEmpty()) return;
-    QRectF box; entities.front()->GetBox(box); box = box.normalized();
+    QRectF box; entities.front()->WorldBox(box); box = box.normalized();
     for (auto* entity : entities) {
-        QRectF next; entity->GetBox(next); next = next.normalized();
+        QRectF next; entity->WorldBox(next); next = next.normalized();
         box = QRectF(QPointF(qMin(box.left(),next.left()),qMin(box.top(),next.top())),
                      QPointF(qMax(box.right(),next.right()),qMax(box.bottom(),next.bottom())));
     }
@@ -1136,40 +1137,17 @@ void MainWindow::moveEntity()
 
 void MainWindow::rotateEntity()
 {
-    rotateEntityAction->setCheckable(true);
-    unCheckAllCommand();
-    rotateEntityAction->setChecked(true);
-
-#ifdef QT_PAINTER
-    //QCAD-QPainter版本
-    ;
-#else
-    scene->rotateEntity();
-#endif // QT_PAINTER
-
+    if(editing_) editing_->transformDialog();
 }
 
 void MainWindow::symetryEntity()
 {
-    symetryEntityAction->setCheckable(true);
-    unCheckAllCommand();
-    symetryEntityAction->setChecked(true);
-
-#ifdef QT_PAINTER
-    //QCAD-QPainter版本
-    ;
-#else
-    scene->symetryEntity();
-#endif // QT_PAINTER
-
+    if(editing_) editing_->transform(0,1,true,false);
 }
 
 void MainWindow::removeEntity()
 {
-    view->selectEntity();
-    const auto selected = view->GetSelectedEntityList();
-    for (auto* entity : selected) { view->removeEntity(entity); delete entity; }
-    view->update();
+    if(editing_) editing_->remove();
 }
 void MainWindow::reportResult(const qcad_more::OperationResult& result)
 {
@@ -1183,6 +1161,8 @@ void MainWindow::closeEvent(QCloseEvent* event)
 MainWindow::~MainWindow()
 {
     view->modifiedChanged = {};
+    view->zoomChanged={};
+    editing_.reset();
     view->setCommand(nullptr);
     g_pMainWnd = nullptr;
 }

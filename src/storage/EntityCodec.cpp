@@ -32,7 +32,9 @@ OperationResult encodeEntity(MEntity& entity, EntitySnapshot& output)
     snapshot.entityType = entity.GetType();
     QDataStream stream(&snapshot.payload, QIODevice::WriteOnly);
     stream.setVersion(QDataStream::Qt_5_12);
+    stream << quint32(0x51454e33); // QEN3: affine transform extension; older payloads have no prefix.
     entity.Serialize(stream, true);
+    stream << entity.GetTransform();
     if (stream.status() != QDataStream::Ok)
         return {ErrorCode::IoError, QStringLiteral("图元编码失败。")};
     output = std::move(snapshot);
@@ -46,9 +48,20 @@ OperationResult decodeEntity(const EntitySnapshot& snapshot, std::unique_ptr<MEn
     if (!entity) return {ErrorCode::UnsupportedEntity, QStringLiteral("文件包含不支持的图元。")};
     QDataStream stream(snapshot.payload);
     stream.setVersion(QDataStream::Qt_5_12);
+    const bool affine = snapshot.payload.startsWith(QByteArray::fromHex("51454e33"));
+    if (affine) { quint32 prefix; stream >> prefix; }
     entity->Serialize(stream, false);
+    if (affine) {
+        QTransform transform; stream >> transform;
+        if (!transform.isAffine() || !transform.isInvertible() ||
+            !std::isfinite(transform.m11()) || !std::isfinite(transform.m12()) ||
+            !std::isfinite(transform.m21()) || !std::isfinite(transform.m22()) ||
+            !std::isfinite(transform.dx()) || !std::isfinite(transform.dy()))
+            return {ErrorCode::InvalidFormat, QStringLiteral("图元变换无效。")};
+        entity->SetTransform(transform);
+    }
     QRectF box;
-    entity->GetBox(box);
+    entity->WorldBox(box);
     if (stream.status() != QDataStream::Ok || !stream.atEnd() ||
         !finitePoint(box.topLeft()) || !finitePoint(box.bottomRight()))
         return {ErrorCode::InvalidFormat, QStringLiteral("图元数据损坏或不完整。")};

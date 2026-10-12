@@ -7,7 +7,7 @@
 namespace qcad_more {
 namespace {
 constexpr quint32 Magic = 0x51424c4b; // QBLK
-constexpr quint32 Version = 2;
+constexpr quint32 Version = 3;
 constexpr quint32 MaxRecords = 100000;
 constexpr qint64 MaxFileBytes = 128 * 1024 * 1024;
 OperationResult invalid() { return {ErrorCode::InvalidFormat, QStringLiteral("文件格式错误、版本不支持或块引用不完整。")}; }
@@ -86,7 +86,7 @@ OperationResult DocumentStorage::load(const QString& path, QCADView& view, Block
     QDataStream in(&file); in.setVersion(QDataStream::Qt_5_12);
     quint32 magic = 0, version = 0, count = 0;
     in >> magic >> version;
-    if (magic != Magic || (version != 1 && version != Version) || !readCount(in, count)) return invalid();
+    if (magic != Magic || version < 1 || version > Version || !readCount(in, count)) return invalid();
     BlockLibrary loaded;
     for (quint32 i = 0; i < count; ++i) {
         BlockDefinition block; quint32 entityCount = 0;
@@ -106,7 +106,7 @@ OperationResult DocumentStorage::load(const QString& path, QCADView& view, Block
     for (quint32 i = 0; i < count; ++i) {
         qint32 type = 0; in >> type;
         if (type == etBlock) {
-            if (version == 2) {
+            if (version >= 2) {
                 EntitySnapshot snapshot; snapshot.entityType = etBlock; in >> snapshot.payload;
                 std::unique_ptr<MEntity> entity;
                 result = decodeEntity(snapshot, entity);

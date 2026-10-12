@@ -10,6 +10,7 @@
 #include <QMainWindow>
 #include <memory>
 #include "integration/QcadBlockActions.h"
+#include "editing/EditingActions.h"
 
 class DiagramScene;
 
@@ -39,12 +40,15 @@ public:
    QCADView* canvas() const { return view; }
    qcad_more::BlockLibrary& blockLibrary() { return blockLibrary_; }
    void editSelectedText();
+   qcad_more::EditingActions& editing() { return *editing_; }
+   qcad_more::QcadBlockActions& blockOperations() { return *blockActions_; }
 protected:
    void closeEvent(QCloseEvent* event) override;
 private:
    void reportResult(const qcad_more::OperationResult& result);
    qcad_more::BlockLibrary blockLibrary_;
    std::unique_ptr<qcad_more::QcadBlockActions> blockActions_;
+   std::unique_ptr<qcad_more::EditingActions> editing_;
 
 public slots:
    //选择命令...

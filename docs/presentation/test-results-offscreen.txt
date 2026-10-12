@@ -37,5 +37,5 @@ QWARN  : BlockWorkflowTests::windowWorkflow() This plugin does not support propa
 QWARN  : BlockWorkflowTests::windowWorkflow() This plugin does not support propagateSizeHints()
 PASS   : BlockWorkflowTests::windowWorkflow()
 PASS   : BlockWorkflowTests::cleanupTestCase()
-Totals: 15 passed, 0 failed, 0 skipped, 0 blacklisted, 1226ms
+Totals: 15 passed, 0 failed, 0 skipped, 0 blacklisted, 1218ms
 ********* Finished testing of BlockWorkflowTests *********

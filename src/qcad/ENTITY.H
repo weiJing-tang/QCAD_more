@@ -66,6 +66,7 @@ protected:
 	int			m_type;		// 图元类型（EEntityType）
 	QPen        m_pen;
 	QBrush      m_brush;    //不是所有实体都要
+    QTransform m_transform;
 
 public:
 	int			m_nOperationNum;  //第几次操作声称的
@@ -119,6 +120,17 @@ public:
 	void SetBrush(QBrush& brush);
 	QPen GetPen() const;
 	QBrush GetBrush() const;
+    QTransform GetTransform() const { return m_transform; }
+    void SetTransform(const QTransform& transform) { m_transform = transform; }
+    void WorldBox(QRectF& box) { GetBox(box); box = m_transform.mapRect(box.normalized()); }
+    bool HitTest(const QPointF& point, double radius) {
+        const double scale = std::hypot(m_transform.m11(), m_transform.m12());
+        return scale > 0 && Pick(m_transform.inverted().map(point), radius / scale);
+    }
+    void TranslateWorld(const QPointF& delta) {
+        if (m_transform.isIdentity()) Move(QPointF(), delta);
+        else { QTransform translation; translation.translate(delta.x(), delta.y()); m_transform *= translation; }
+    }
 };
 
 //直线，实例

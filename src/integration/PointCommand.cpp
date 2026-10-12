@@ -10,6 +10,7 @@ PointCommand::PointCommand(QCADView* view, Handler commit, Handler preview, bool
 int PointCommand::OnLButtonDown(QMouseEvent* event)
 {
     if (finished_) return 0;
+    m_pDC->beginEdit();
     const auto result = commit_(m_pDC->ScreentoWorld(event->pos()));
     if (!result.ok()) QMessageBox::warning(m_pDC, QStringLiteral("操作未完成"), result.message);
     else {
@@ -20,6 +21,7 @@ int PointCommand::OnLButtonDown(QMouseEvent* event)
             QTimer::singleShot(0, m_pDC, [view=m_pDC] { view->selectEntity(); });
         }
     }
+    m_pDC->endEdit();
     return 0;
 }
 int PointCommand::OnMouseMove(QMouseEvent* event)
